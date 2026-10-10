@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vPager</title>
+<link rel="stylesheet" href="pager.css">
+</head>
+<body>
+<main id="stage">
+  <div id="fit">
+    <div id="pager" aria-label="Virtual pager">
+      <div class="lip"></div>
+      <div class="lamp" id="lamp" title="Alert lamp"></div>
+      <button class="side-btn" data-key="power" title="On/Reset (O) — hold for off" aria-label="On/Reset"></button>
+      <div class="grip" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+
+      <div class="bezel">
+        <div class="lcd" id="lcd"><canvas id="lcd-canvas"></canvas></div>
+      </div>
+
+      <button class="key key-read" data-key="read" title="Read (Enter)" aria-label="Read"><span class="mark yellow"></span></button>
+      <button class="key key-func" data-key="func" title="Function (F) — hold for backlight" aria-label="Function"><span class="mark red"></span></button>
+
+      <div class="badge">
+        <span class="logo">V</span>
+        <span class="brand">vPAGER</span>
+        <span class="model">MESSAGE RECEIVER</span>
+      </div>
+
+      <div class="dpad">
+        <button class="pad pad-left" data-key="left" title="Left (←)" aria-label="Left">
+          <svg viewBox="0 0 10 12"><polygon points="9,0 9,12 0,6"/></svg>
+        </button>
+        <button class="pad pad-up" data-key="up" title="Up (↑)" aria-label="Up">
+          <svg viewBox="0 0 12 10"><polygon points="0,9 12,9 6,0"/></svg>
+        </button>
+        <button class="pad pad-down" data-key="down" title="Down (↓)" aria-label="Down">
+          <svg viewBox="0 0 12 10"><polygon points="0,1 12,1 6,10"/></svg>
+        </button>
+        <button class="pad pad-right" data-key="right" title="Right (→)" aria-label="Right">
+          <svg viewBox="0 0 10 12"><polygon points="1,0 1,12 10,6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <section id="info">
+    <div id="sound-hint">Click anywhere once to enable sound.</div>
+    <div id="status-line">Connecting…</div>
+    <div id="decode-line"></div>
+    <div id="keys-line">Keys: Enter = Read · F = Function (hold = backlight) · arrows · O = On/Reset (hold = off)</div>
+    <div id="log-line"></div>
+  </section>
+</main>
+<script src="font.js"></script>
+<script src="pager.js"></script>
+</body>
+</html>

@@ -91,6 +91,17 @@ Interim approach (works today): a custom dialplan context in `/etc/asterisk/exte
 
 Target approach: replace `CURL()` with a Python AGI script that imports this package, for better validation, retries and logging.
 
+## vpager (virtual pager, `vpager/`)
+
+Receive side: a Motorola Advisor-style pager in the browser that answers to one capcode. Stdlib only.
+
+- Audio in: raw UDP on 8888 (same SDR++ network-sink stream mmng-ui takes), piped into multimon-ng. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
+- `decode.py` parses multimon-ng POCSAG lines; `core.py` does capcode filter + duplicate suppression and pushes server-sent events; `store.py` holds memory per the Advisor manual (`refdocs/advisor_inst.pdf`): 19 slots, 10 locked, Personal Message File of 10.
+- `web/` is the pager face (canvas 5x7 dot-matrix LCD, 4x20) and the button state machine.
+- Log: everything at DEBUG to `<data-dir>/vpager.log` (rotating), including every multimon-ng line, filter verdicts, UDP start/stop, and browser key presses/errors via `/api/log`. Data dir defaults to `%LOCALAPPDATA%\vpager` (Windows).
+- Run: `python -m vpager --capcode 870024` (or `--base 87 --pager 3`). Test without radio: `python -m vpager inject "555-1212"`. Tests: `python -m unittest tests.test_vpager`.
+- Unconfirmed: whether `-f alpha` (mmng-ui's default, kept here) mangles HME numeric (type=1) pages; try `--decode-mode auto` or `standard` if they look wrong. Which Advisor button is Read vs Function is a guess (yellow = Read, red = Function).
+
 ## Conventions
 
 - Python 3, standard library only. No third-party runtime dependencies.
