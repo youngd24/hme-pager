@@ -314,6 +314,15 @@ class PosixPortTests(unittest.TestCase):
                 Page(PageType.ALPHA, "x", capcodes=(870008,)))
         t.join(3)
 
+    def test_permission_denied_mentions_dialout(self):
+        import errno
+        from hmew import TransmitterUnreachable
+        from hmew.serialport import PosixPort
+        denied = PermissionError(errno.EACCES, "Permission denied")
+        with mock.patch("os.open", side_effect=denied):
+            with self.assertRaisesRegex(TransmitterUnreachable, "Permission denied; .*dialout"):
+                PosixPort("/dev/ttyS0")
+
     def test_second_sender_waits_then_gives_up(self):
         from hmew import TransmitterUnreachable
         from hmew.serialport import PosixPort

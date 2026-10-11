@@ -9,7 +9,7 @@ Everything is plain Python 3 with no third-party dependencies, so it runs as-is 
       (send)                         (transmitter)                                         (receive and display)
 ```
 
-## Hardware tested
+## Hardware and systems tested
 
 Everything here was built and tested against an HME/JTECH **ISTATION-N** transmitter reporting these software versions:
 
@@ -18,6 +18,8 @@ PVer: 2.48   RVer: 003
 ```
 
 Other models or firmware versions may behave differently, particularly in their replies and in how they encode pages on air.
+
+Operating systems: **Ubuntu 24.04** for Linux and **Windows 11** for Windows. Serial sending was tested on Ubuntu; on Windows it would use `pyserial` and hasn't been tried with the transmitter.
 
 ## What's inside
 
@@ -132,6 +134,7 @@ Capcode = 3-digit base ID followed by pager × 8 as 4 digits. For example, base 
 - **Cable:** a straight-through RS-232 cable (not a null-modem cable) with a DB9 male connector at the transmitter end. The transmitter's serial port is a DB9 female.
 - **Format:** the Scope format (HMEW doc section 4.A), for example `AF0870008ATest page` followed by a carriage return. The parts are the type (`A` alpha, `N` numeric), `F` for 1200 baud (always sent, as the doc says), the 7-digit capcode, beep `A`, and the message.
 - **Port settings:** 9600 baud, 8 data bits, no parity, 1 stop bit, no flow control.
+- **Permissions (Linux):** the user sending pages must be allowed to open the serial port. On Ubuntu, and likely Debian and other distributions, serial ports belong to the `dialout` group. Add the user with `sudo usermod -aG dialout $USER`, then log out and back in (or start a new login session) for it to take effect. Without it, the port fails to open with "Permission denied". Some distributions use a different group; `ls -l /dev/ttyS0` shows which one owns the port.
 - **Reply:** the unit answers `OK` when it accepts a command, and never sends an error reply. It says `OK` for any valid capcode, even one no pager uses (0870001 was accepted in testing). Capcodes the unit rejects are refused by `pager.py` before sending, so in practice no `OK` within 3 seconds means a cable, port or unit-setting problem, and the error says to check those.
 - **Group pages:** each capcode gets its own command. If one goes unanswered, the error says how many were already sent, so you don't page those people twice.
 - **One sender at a time:** while a page is being sent, the serial port is locked, and a second sender waits up to 10 seconds for its turn.

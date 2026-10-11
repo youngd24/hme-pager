@@ -9,6 +9,7 @@ exclusive lock, so two senders can't interleave commands.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import select
@@ -52,7 +53,12 @@ class PosixPort(Port):
         try:
             self.fd = os.open(device, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
         except OSError as exc:
-            raise TransmitterUnreachable(f"cannot open serial port {device}: {exc.strerror}") from exc
+            hint = ""
+            if exc.errno == errno.EACCES:
+                hint = (f"; on Ubuntu/Debian add yourself to the dialout group "
+                        f"(sudo usermod -aG dialout $USER, then log in again), "
+                        f"or check the group with ls -l {device}")
+            raise TransmitterUnreachable(f"cannot open serial port {device}: {exc.strerror}{hint}") from exc
         try:
             self._lock(lock_timeout)
             self._configure()

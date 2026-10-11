@@ -7,7 +7,8 @@ Goal: let a FreePBX IVR (or any script) send **numeric** pages to the transmitte
 ## Hardware and environment
 
 - Transmitter: JTECH/HME iStation, model **ISTATION-N**, firmware reporting `PVer: 2.48 RVer: 003` (HME Wireless Computer Controlled Paging System), POCSAG at 457.5750 MHz (HME's standard US frequency), 1200 baud default. Everything in this repo was built and tested against that unit.
-- Serial cable: straight-through RS-232 (not null-modem), DB9 male at the transmitter end; the transmitter's port is DB9 female. Connected to the user's Linux box (`/dev/ttyS0`).
+- Serial cable: straight-through RS-232 (not null-modem), DB9 male at the transmitter end; the transmitter's port is DB9 female. Connected to the user's Linux box (`/dev/ttyS0`). The sending user must be in the `dialout` group on Ubuntu/Debian (`sudo usermod -aG dialout $USER`, then log in again); `PosixPort` adds that hint to a "Permission denied" error.
+- Systems tested: Ubuntu 24.04 (Linux, incl. the serial box) and Windows 11 (dev machine, Capcoder, HTTP sending). The Windows serial path (pyserial) has never been run against the transmitter.
 - Transmitter IP on the lab network: 192.168.42.66, port 80 (from the user's curl tests; confirm before hard-coding).
 - Reception/verification rig: RTL-SDR on Windows 10 (Zadig/WinUSB, `rtl_fm` piped to `multimon-ng`, or to `nc` to feed Capcoder over UDP). Decode command that works:
   `rtl_fm -f 457.5750M -s 22050 -g 30 - | multimon-ng -t raw -a POCSAG1200 -f alpha -`
