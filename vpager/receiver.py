@@ -11,15 +11,17 @@ Changes from the original:
 - reads stderr while multimon-ng runs, not only after stdout closes
 - restarts multimon-ng if it exits; keeps listening if it is missing
 - listens on a dual-stack socket so IPv4 and IPv6 senders both work
-- POCSAG only (no FLEX), no sox stage, no JSON mode
+- POCSAG only (no FLEX), no sox stage, no JSON mode, no -u
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
 import socket
+import sys
 import threading
 from asyncio.subprocess import PIPE
 from typing import TYPE_CHECKING, Optional
@@ -37,13 +39,25 @@ STATS_EVERY = 60.0
 
 DECODE_MODES = ("alpha", "numeric", "auto", "standard")
 
+# Searched after PATH when the binary is given by bare name.
+EXTRA_DIRS = [r"C:\rtl-sdr"] if sys.platform == "win32" else []
+
+
+def find_binary(binary: str):
+    """Full path to binary: on PATH, as given, or in EXTRA_DIRS. None if not found."""
+    found = shutil.which(binary)
+    if found is None and EXTRA_DIRS and os.path.basename(binary) == binary:
+        found = shutil.which(binary, path=os.pathsep.join(EXTRA_DIRS))
+    return found
+
 
 def multimon_args(mode: str = "alpha", charset: str = "US") -> list[str]:
     """mmng-ui's arguments, POCSAG only. mode 'standard' leaves out -f."""
     args = ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"]
     if mode != "standard":
         args += ["-f", mode]
-    args += ["-t", "raw", "-u", "-q", "--timestamp", "-p", "-C", charset, "-"]
+    # mmng-ui also passes -u (prune unlikely POCSAG decodes); left out, it caused problems here.
+    args += ["-t", "raw", "-q", "--timestamp", "-p", "-C", charset, "-"]
     return args
 
 
@@ -159,13 +173,14 @@ class Receiver:
             log.info("receiver stopped")
 
     async def _run_decoder(self) -> None:
-        exe = shutil.which(self.binary)
+        exe = find_binary(self.binary)
         if exe is None:
             if not self._warned_missing:
+                where = " or ".join(["PATH"] + EXTRA_DIRS)
                 log.error(
-                    "multimon-ng not found (%r). Put it on PATH or pass --mmng PATH. "
+                    "multimon-ng not found (%r in %s). Pass --mmng PATH. "
                     "Decoding is off until it is found; injected test pages still work.",
-                    self.binary,
+                    self.binary, where,
                 )
                 self._warned_missing = True
             self.core.set_status(decoder="missing")

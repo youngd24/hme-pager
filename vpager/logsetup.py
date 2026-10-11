@@ -14,8 +14,10 @@ DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 def default_data_dir() -> Path:
     if sys.platform == "win32":
-        base = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
-    elif sys.platform == "darwin":
+        # Not %LOCALAPPDATA%: Microsoft Store Python silently redirects writes there into
+        # its package sandbox, so the printed path would never exist.
+        return Path.home() / ".vpager"
+    if sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support"
     else:
         base = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")

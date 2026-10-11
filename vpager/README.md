@@ -17,7 +17,7 @@ Python 3, standard library only. The pager face is a single local web page, so i
 ### Requirements
 
 - Python 3.9 or newer (developed and tested on 3.13).
-- [multimon-ng](https://github.com/EliasOenal/multimon-ng), on PATH or passed with `--mmng`.
+- [multimon-ng](https://github.com/EliasOenal/multimon-ng). vpager looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with the v1.3.1 build in `C:\rtl-sdr`.
 - Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. The SDR++ network sink does this, with the same settings mmng-ui uses.
 
 ### Run
@@ -44,7 +44,7 @@ Once set, the capcode is saved. Later runs remember it, and you can also change 
 | `--udp-bind` | `::` | listen address for audio (all addresses, IPv4 and IPv6) |
 | `--http-host` | 127.0.0.1 | address for the pager page; `0.0.0.0` lets other machines (e.g. a phone) view it |
 | `--http-port` | 8073 | port for the pager page |
-| `--mmng` | `multimon-ng` | multimon-ng binary |
+| `--mmng` | `multimon-ng` | multimon-ng binary; a bare name is looked up on PATH, then in `C:\rtl-sdr` on Windows |
 | `--decode-mode` | `alpha` | multimon-ng `-f` mode: `alpha`, `numeric`, `auto`, or `standard` (no `-f`) |
 | `--charset` | `US` | multimon-ng `-C` charset |
 | `--mmng-args "..."` | | replace all multimon-ng arguments |
@@ -55,7 +55,9 @@ Once set, the capcode is saved. Later runs remember it, and you can also change 
 | `--no-browser` | | don't open a browser |
 | `-v` | | show DEBUG messages on the console too |
 
-Default data directory: `%LOCALAPPDATA%\vpager` on Windows, `~/Library/Application Support/vpager` on macOS, `~/.local/state/vpager` on Linux.
+Default data directory: `%USERPROFILE%\.vpager` on Windows, `~/Library/Application Support/vpager` on macOS, `~/.local/state/vpager` on Linux.
+
+On Windows it is deliberately not under `%LOCALAPPDATA%`. The Microsoft Store build of Python silently redirects writes there into its own package folder (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.*\LocalCache\Local\...`), so the log would not be where vpager says it is.
 
 ### Sending test pages without a radio
 

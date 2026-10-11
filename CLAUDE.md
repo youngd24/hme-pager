@@ -95,10 +95,10 @@ Target approach: replace `CURL()` with a Python AGI script that imports this pac
 
 Receive side: a Motorola Advisor-style pager in the browser that answers to one capcode. Stdlib only.
 
-- Audio in: raw UDP on 8888 (same SDR++ network-sink stream mmng-ui takes), piped into multimon-ng. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
+- Audio in: raw UDP on 8888 (same SDR++ network-sink stream mmng-ui takes), piped into multimon-ng. multimon-ng is found on PATH, then in `C:\rtl-sdr` on Windows (`receiver.EXTRA_DIRS`; v1.3.1 there works). Uses mmng-ui's multimon-ng flags minus `-u`, which caused problems for the user. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
 - `decode.py` parses multimon-ng POCSAG lines; `core.py` does capcode filter + duplicate suppression and pushes server-sent events; `store.py` holds memory per the Advisor manual (`refdocs/advisor_inst.pdf`): 19 slots, 10 locked, Personal Message File of 10.
 - `web/` is the pager face (canvas 5x7 dot-matrix LCD, 4x20) and the button state machine.
-- Log: everything at DEBUG to `<data-dir>/vpager.log` (rotating), including every multimon-ng line, filter verdicts, UDP start/stop, and browser key presses/errors via `/api/log`. Data dir defaults to `%LOCALAPPDATA%\vpager` (Windows).
+- Log: everything at DEBUG to `<data-dir>/vpager.log` (rotating), including every multimon-ng line, filter verdicts, UDP start/stop, and browser key presses/errors via `/api/log`. Data dir defaults to `%USERPROFILE%\.vpager` on Windows, deliberately not `%LOCALAPPDATA%`: the user's Python is the Microsoft Store build, which silently redirects AppData writes into its package sandbox (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.13_*\LocalCache\Local\...`).
 - Run: `python -m vpager --capcode 870024` (or `--base 87 --pager 3`). Test without radio: `python -m vpager inject "555-1212"`. Tests: `python -m unittest tests.test_vpager`.
 - Unconfirmed: whether `-f alpha` (mmng-ui's default, kept here) mangles HME numeric (type=1) pages; try `--decode-mode auto` or `standard` if they look wrong. Which Advisor button is Read vs Function is a guess (yellow = Read, red = Function).
 
