@@ -7,7 +7,7 @@ options override them.
     mode = serial              # network or serial
     host = 192.168.1.100       # for network: host or host:port
     serial_port = /dev/ttyS0   # for serial
-    base = 087                 # base ID, to page by pager number over serial
+    base = 087                 # base ID, for paging by pager number
     type = alpha               # alpha or numeric
     verbose = false            # true or false
 """
@@ -32,23 +32,31 @@ DEFAULT_PATH = Path.home() / ".hme-pager" / "config"
 
 
 class ConfigError(PagerError):
-    """The config file is missing (when asked for explicitly), unreadable or has a bad setting."""
+    """The config file can't be used.
+
+    It is missing (when asked for explicitly), unreadable, or has a bad
+    setting.
+    """
 
 
 @dataclass
 class Settings:
-    mode: Optional[str] = None          # "network" or "serial"
-    host: Optional[str] = None          # "host" or "host:port"
+    mode: Optional[str] = None  # "network" or "serial"
+    host: Optional[str] = None  # "host" or "host:port"
     serial_port: Optional[str] = None
     base: Optional[int] = None
-    type: Optional[str] = None          # "alpha" or "numeric"
+    type: Optional[str] = None  # "alpha" or "numeric"
     verbose: bool = False
-    path: Optional[Path] = None         # the file these came from; None if no file
-    set_in_file: Dict[str, str] = field(default_factory=dict)   # key -> raw value, for -v
+    path: Optional[Path] = None  # the file these came from; None if no file
+    # key -> raw value as written in the file, for -v
+    set_in_file: Dict[str, str] = field(default_factory=dict)
 
 
 def load(path: Union[str, Path, None] = None) -> Settings:
-    """Read settings. With no path, a missing ~/.hme-pager/config just means no defaults."""
+    """Read settings.
+
+    With no path, a missing ~/.hme-pager/config just means no defaults.
+    """
     explicit = path is not None
     path = Path(path) if explicit else DEFAULT_PATH
     if not path.is_file():
@@ -56,7 +64,9 @@ def load(path: Union[str, Path, None] = None) -> Settings:
             raise ConfigError(f"config file {path} not found")
         return Settings()
 
-    cp = configparser.ConfigParser(inline_comment_prefixes=("#", ";"), interpolation=None)
+    cp = configparser.ConfigParser(
+        inline_comment_prefixes=("#", ";"), interpolation=None
+    )
     try:
         with open(path, encoding="utf-8") as f:
             cp.read_file(f)
@@ -65,10 +75,15 @@ def load(path: Union[str, Path, None] = None) -> Settings:
 
     extra = [s for s in cp.sections() if s != SECTION]
     if extra:
-        raise ConfigError(f"{path}: unknown section [{extra[0]}]; settings go under [{SECTION}]")
+        raise ConfigError(
+            f"{path}: unknown section [{extra[0]}]; "
+            f"settings go under [{SECTION}]"
+        )
     if not cp.has_section(SECTION):
         if cp.defaults():
-            raise ConfigError(f"{path}: settings must be under a [{SECTION}] section")
+            raise ConfigError(
+                f"{path}: settings must be under a [{SECTION}] section"
+            )
         return Settings(path=path)
 
     s = Settings(path=path)
@@ -77,7 +92,10 @@ def load(path: Union[str, Path, None] = None) -> Settings:
         raw = section[key].strip()
         where = f"{path}: {key} = {raw!r}"
         if key not in KEYS:
-            raise ConfigError(f"{path}: unknown setting {key!r}; known settings: {', '.join(KEYS)}")
+            raise ConfigError(
+                f"{path}: unknown setting {key!r}; "
+                f"known settings: {', '.join(KEYS)}"
+            )
         if not raw:
             raise ConfigError(f"{where}: empty value")
         if key == "mode":

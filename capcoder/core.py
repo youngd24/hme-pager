@@ -53,19 +53,30 @@ class Hub:
             try:
                 q.put_nowait((event, payload))
             except queue.Full:
-                log.warning("browser is not keeping up, dropping its connection")
+                log.warning(
+                    "browser is not keeping up, dropping its connection"
+                )
                 self.unsubscribe(q)
 
 
 class Core:
-    def __init__(self, store: Store, hub: Hub, dedupe_seconds: float, log_file: Optional[Path]):
+    def __init__(
+        self,
+        store: Store,
+        hub: Hub,
+        dedupe_seconds: float,
+        log_file: Optional[Path],
+    ):
         self.store = store
         self.hub = hub
         self.dedupe_seconds = dedupe_seconds
         self.log_file = log_file
         self.status: dict[str, Any] = {
-            "udp": "starting", "udp_port": None, "sender": None,
-            "decoder": "starting", "packets": 0,
+            "udp": "starting",
+            "udp_port": None,
+            "sender": None,
+            "decoder": "starting",
+            "packets": 0,
         }
         self.last_decode: Optional[dict] = None
         self._lock = threading.Lock()
@@ -77,13 +88,19 @@ class Core:
             snap["status"] = dict(self.status)
             snap["last_decode"] = self.last_decode
         snap["log_file"] = str(self.log_file) if self.log_file else None
-        snap["limits"] = {"slots": MAX_SLOTS, "locked": MAX_LOCKED, "personal": MAX_PERSONAL}
+        snap["limits"] = {
+            "slots": MAX_SLOTS,
+            "locked": MAX_LOCKED,
+            "personal": MAX_PERSONAL,
+        }
         snap["version"] = __version__
         return snap
 
     def set_status(self, publish: bool = True, **changes: Any) -> None:
         with self._lock:
-            changed = {k: v for k, v in changes.items() if self.status.get(k) != v}
+            changed = {
+                k: v for k, v in changes.items() if self.status.get(k) != v
+            }
             self.status.update(changes)
             status = dict(self.status)
         if changed and publish:
@@ -93,7 +110,10 @@ class Core:
         self.hub.publish("state", self.state())
 
     def handle_line(self, line: str, source: str) -> str:
-        """Process one line of multimon-ng output. Returns what happened, for the log and inject."""
+        """Process one line of multimon-ng output.
+
+        Returns what happened, for the log and inject.
+        """
         decode_log.info("%s: %s", source, line)
         page = parse_line(line)
         if page is None:
@@ -114,27 +134,45 @@ class Core:
                 last = self._seen.get(key)
                 self._seen[key] = now
                 # Forget old entries so the table can't grow forever.
-                self._seen = {k: t for k, t in self._seen.items() if now - t < max(self.dedupe_seconds, 1)}
+                self._seen = {
+                    k: t
+                    for k, t in self._seen.items()
+                    if now - t < max(self.dedupe_seconds, 1)
+                }
                 if last is not None and now - last < self.dedupe_seconds:
                     verdict = "ignored: duplicate"
                 else:
                     verdict = "stored"
             self.last_decode = {
-                "time": datetime.now().astimezone().isoformat(timespec="seconds"),
-                "capcode": page.capcode, "function": page.function,
-                "kind": page.kind, "text": page.text, "verdict": verdict,
+                "time": datetime.now()
+                .astimezone()
+                .isoformat(timespec="seconds"),
+                "capcode": page.capcode,
+                "function": page.function,
+                "kind": page.kind,
+                "text": page.text,
+                "verdict": verdict,
             }
             last_decode = dict(self.last_decode)
 
         decode_log.info(
             "page capcode=%d function=%d kind=%s text=%r -> %s",
-            page.capcode, page.function, page.kind, page.text, verdict,
+            page.capcode,
+            page.function,
+            page.kind,
+            page.text,
+            verdict,
         )
         self.hub.publish("decode", last_decode)
         if verdict != "stored":
             return verdict
 
         msg = self.store.add(page, datetime.now().astimezone())
-        log.info("new message id=%d for capcode %d: %r", msg["id"], page.capcode, page.text)
+        log.info(
+            "new message id=%d for capcode %d: %r",
+            msg["id"],
+            page.capcode,
+            page.text,
+        )
         self.hub.publish("page", {"message": msg, "state": self.state()})
         return verdict

@@ -4,8 +4,9 @@ GET  /                -> web/index.html (and other files in web/)
 GET  /api/state       -> full state as JSON
 GET  /api/events      -> server-sent events: state, page, status, decode
 POST /api/action      -> {"action": ..., "id": ..., "value": ...}
-POST /api/log         -> {"level": ..., "msg": ...} from the browser, into the log file
-POST /api/inject      -> {"line": "<multimon-ng line>"}, loopback clients only
+POST /api/log         -> {"level": ..., "msg": ...} from the browser,
+                         into the log file
+POST /api/inject      -> {"line": "<multimon-ng line>"}, loopback only
 """
 
 from __future__ import annotations
@@ -36,15 +37,21 @@ CONTENT_TYPES = {
     ".png": "image/png",
     ".ico": "image/x-icon",
 }
-UI_LEVELS = {"debug": logging.DEBUG, "info": logging.INFO, "warn": logging.WARNING, "error": logging.ERROR}
+UI_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warn": logging.WARNING,
+    "error": logging.ERROR,
+}
 
 
 class PagerServer(ThreadingHTTPServer):
     daemon_threads = True
     block_on_close = False
-    # HTTPServer turns on SO_REUSEADDR, which on Windows lets a second process bind a
-    # port that is already in use. Off there, plus exclusive use, so a second capcoder
-    # fails to start instead of quietly sharing the port.
+    # HTTPServer turns on SO_REUSEADDR, which on Windows lets a second
+    # process bind a port that is already in use. Off there, plus exclusive
+    # use, so a second capcoder fails to start instead of quietly sharing
+    # the port.
     allow_reuse_address = sys.platform != "win32"
 
     def __init__(self, addr, core: Core):
@@ -53,7 +60,9 @@ class PagerServer(ThreadingHTTPServer):
 
     def server_bind(self) -> None:
         if sys.platform == "win32":
-            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            self.socket.setsockopt(
+                socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1
+            )
         super().server_bind()
 
 
@@ -62,13 +71,16 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "capcoder"
 
     def log_message(self, fmt, *args) -> None:
-        if "/api/log " in self.requestline:   # the UI line itself is already logged
+        if (
+            "/api/log " in self.requestline
+        ):  # the UI line itself is already logged
             return
         log.debug("%s %s", self.client_address[0], fmt % args)
 
     # ---- GET ----
 
-    def do_GET(self) -> None:
+    # do_GET / do_POST: names required by http.server, not PEP 8 choices.
+    def do_GET(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
         if path == "/api/state":
             self._json(self.server.core.state())
@@ -86,7 +98,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         body = target.read_bytes()
         self.send_response(200)
-        self.send_header("Content-Type", CONTENT_TYPES.get(target.suffix, "application/octet-stream"))
+        self.send_header(
+            "Content-Type",
+            CONTENT_TYPES.get(target.suffix, "application/octet-stream"),
+        )
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -118,12 +133,14 @@ class Handler(BaseHTTPRequestHandler):
             log.info("browser disconnected from %s", who)
 
     def _send_event(self, event: str, payload: str) -> None:
-        self.wfile.write(f"event: {event}\ndata: {payload}\n\n".encode("utf-8"))
+        self.wfile.write(
+            f"event: {event}\ndata: {payload}\n\n".encode("utf-8")
+        )
         self.wfile.flush()
 
     # ---- POST ----
 
-    def do_POST(self) -> None:
+    def do_POST(self) -> None:  # noqa: N802
         path = urlsplit(self.path).path
         body = self._read_json()
         if body is None:
@@ -134,19 +151,32 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 core.store.apply(action, body.get("id"), body.get("value"))
             except StoreError as e:
-                log.info("action %s id=%s refused: %s", action, body.get("id"), e)
-                self._json({"ok": False, "error": str(e), "state": core.state()})
+                log.info(
+                    "action %s id=%s refused: %s", action, body.get("id"), e
+                )
+                self._json(
+                    {"ok": False, "error": str(e), "state": core.state()}
+                )
                 return
-            log.info("action %s id=%s value=%r", action, body.get("id"), body.get("value"))
+            log.info(
+                "action %s id=%s value=%r",
+                action,
+                body.get("id"),
+                body.get("value"),
+            )
             core.publish_state()
             self._json({"ok": True, "state": core.state()})
         elif path == "/api/log":
-            level = UI_LEVELS.get(str(body.get("level", "info")).lower(), logging.INFO)
+            level = UI_LEVELS.get(
+                str(body.get("level", "info")).lower(), logging.INFO
+            )
             ui_log.log(level, "%s", str(body.get("msg", ""))[:2000])
             self._json({"ok": True})
         elif path == "/api/inject":
             if not ipaddress.ip_address(self.client_address[0]).is_loopback:
-                self.send_error(403, "inject is only allowed from this machine")
+                self.send_error(
+                    403, "inject is only allowed from this machine"
+                )
                 return
             line = str(body.get("line", ""))
             result = core.handle_line(line, "inject")

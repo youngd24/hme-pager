@@ -26,9 +26,9 @@ _CTRL_RE = re.compile(r"<[A-Za-z]{3}>")
 class Page:
     capcode: int
     function: int
-    kind: str       # "alpha", "numeric" or "tone" (address only, no text)
+    kind: str  # "alpha", "numeric" or "tone" (address only, no text)
     text: str
-    protocol: str   # e.g. "POCSAG1200"
+    protocol: str  # e.g. "POCSAG1200"
 
 
 def parse_line(line: str) -> Optional[Page]:

@@ -1,6 +1,7 @@
 """Tests for hmew message checks and the pager.py command line.
 
-The command-line tests send to a fake transmitter on 127.0.0.1, never the real unit.
+The command-line tests send to a fake transmitter on 127.0.0.1, never the
+real unit.
 """
 
 import contextlib
@@ -34,7 +35,9 @@ class MessageTests(unittest.TestCase):
 
     def test_numeric_rejects_letters_with_hint(self):
         self.bad("555-CALL", PageType.VIBE_NUMERIC, "send text as alpha")
-        self.bad("u", PageType.VIBE_NUMERIC, "'u'")   # only capital U means urgent
+        self.bad(
+            "u", PageType.VIBE_NUMERIC, "'u'"
+        )  # only capital U means urgent
 
     def test_numeric_rejects_trailing_newline(self):
         # the old ^...$ regex let this through
@@ -45,7 +48,13 @@ class MessageTests(unittest.TestCase):
         self.bad("1" * 21, PageType.VIBE_NUMERIC, "max 20")
 
     def test_alpha_allowed(self):
-        for msg in ("hello", "Barcode Error Aisle 3", "5551212", "a~!@#$%^&*()", "x" * 128):
+        for msg in (
+            "hello",
+            "Barcode Error Aisle 3",
+            "5551212",
+            "a~!@#$%^&*()",
+            "x" * 128,
+        ):
             self.ok(msg, PageType.ALPHA)
 
     def test_alpha_rejects_control_and_non_ascii(self):
@@ -67,7 +76,7 @@ class FakeTransmitter:
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self):
+            def do_GET(self):  # noqa: N802 (name required by http.server)
                 outer.requests.append(self.path)
                 body = reply.encode()
                 self.send_response(status)
@@ -94,9 +103,12 @@ class FakeTransmitter:
 class CommandLineTests(unittest.TestCase):
     def setUp(self):
         self.tx = FakeTransmitter()
-        # Never read the real ~/.hme-pager/config: point the default at an empty temp dir.
+        # Never read the real ~/.hme-pager/config: point the default at an
+        # empty temp dir.
         self.tmp = tempfile.TemporaryDirectory()
-        self.cfg = mock.patch("hmew.config.DEFAULT_PATH", Path(self.tmp.name) / "config")
+        self.cfg = mock.patch(
+            "hmew.config.DEFAULT_PATH", Path(self.tmp.name) / "config"
+        )
         self.cfg.start()
 
     def tearDown(self):
@@ -109,36 +121,60 @@ class CommandLineTests(unittest.TestCase):
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             try:
                 code = pager.main(list(argv))
-            except SystemExit as e:   # argparse usage errors
+            except SystemExit as e:  # argparse usage errors
                 code = e.code
         return code, out.getvalue(), err.getvalue()
 
     def test_numeric_page(self):
-        code, out, _ = self.run_cli("-n", "-p", "3", "-h", self.tx.host, "555-1212")
+        code, out, _ = self.run_cli(
+            "-n", "-p", "3", "-h", self.tx.host, "555-1212"
+        )
         self.assertEqual(code, 0)
         q = self.tx.last_query()
-        self.assertEqual((q["pager"], q["type"], q["msg"]), ("3", "1", "555-1212"))
+        self.assertEqual(
+            (q["pager"], q["type"], q["msg"]), ("3", "1", "555-1212")
+        )
         self.assertIn("!sc1", out)
 
     def test_alpha_page_long_options_and_words_joined(self):
-        code, _, _ = self.run_cli("--alpha", "--pager", "7", "--host", self.tx.host, "Barcode", "Error", "Aisle", "3")
+        code, _, _ = self.run_cli(
+            "--alpha",
+            "--pager",
+            "7",
+            "--host",
+            self.tx.host,
+            "Barcode",
+            "Error",
+            "Aisle",
+            "3",
+        )
         self.assertEqual(code, 0)
         q = self.tx.last_query()
-        self.assertEqual((q["pager"], q["type"], q["msg"]), ("7", "2", "Barcode Error Aisle 3"))
+        self.assertEqual(
+            (q["pager"], q["type"], q["msg"]),
+            ("7", "2", "Barcode Error Aisle 3"),
+        )
 
     def test_spaces_sent_as_percent20_not_plus(self):
-        # The transmitter doesn't decode '+' as a space; it showed up on the pager.
-        code, _, _ = self.run_cli("-a", "-p", "1", "-h", self.tx.host, "TAPE VOL NOT", "MOUNTED")
+        # The transmitter doesn't decode '+' as a space; it showed up on the
+        # pager.
+        code, _, _ = self.run_cli(
+            "-a", "-p", "1", "-h", self.tx.host, "TAPE VOL NOT", "MOUNTED"
+        )
         self.assertEqual(code, 0)
         raw = urlsplit(self.tx.requests[-1]).query
         self.assertIn("msg=TAPE%20VOL%20NOT%20MOUNTED", raw)
         self.assertNotIn("TAPE+VOL", raw)
-        # a real '+' in the message is still encoded, so it can't be mistaken for anything else
+        # a real '+' in the message is still encoded, so it can't be
+        # mistaken for anything else
         self.run_cli("-a", "-p", "1", "-h", self.tx.host, "1+1")
         self.assertIn("msg=1%2B1", urlsplit(self.tx.requests[-1]).query)
         # group separator between pager numbers stays a literal '+'
         from hmew import PagerClient
-        url = PagerClient("h").build_url([1, 2, 3], PageType.ALPHA, "a b", 1, 1)
+
+        url = PagerClient("h").build_url(
+            [1, 2, 3], PageType.ALPHA, "a b", 1, 1
+        )
         self.assertIn("pager=1+2+3&", url)
 
     def test_options_after_message(self):
@@ -147,14 +183,23 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(self.tx.last_query()["msg"], "hello")
 
     def test_environment_variables_are_ignored(self):
-        with mock.patch.dict(os.environ, {"HMEWHOST": self.tx.host, "HMEWSERIAL": "/dev/x", "HMEWBASE": "087"}):
+        with mock.patch.dict(
+            os.environ,
+            {
+                "HMEWHOST": self.tx.host,
+                "HMEWSERIAL": "/dev/x",
+                "HMEWBASE": "087",
+            },
+        ):
             code, _, err = self.run_cli("-n", "-p", "1", "5551212")
         self.assertEqual(code, 2)
         self.assertIn("say how to send", err)
         self.assertEqual(self.tx.requests, [])
 
     def test_alpha_and_numeric_are_mutually_exclusive(self):
-        code, _, err = self.run_cli("-a", "-n", "-p", "1", "-h", self.tx.host, "x")
+        code, _, err = self.run_cli(
+            "-a", "-n", "-p", "1", "-h", self.tx.host, "x"
+        )
         self.assertEqual(code, 2)
         self.assertIn("mutually exclusive", err)
         self.assertIn("--help", err)
@@ -168,16 +213,22 @@ class CommandLineTests(unittest.TestCase):
     def test_pager_required_and_checked(self):
         self.assertEqual(self.run_cli("-n", "-h", self.tx.host, "1")[0], 2)
         for bad in ("0", "1000", "three"):
-            code, _, err = self.run_cli("-n", "-p", bad, "-h", self.tx.host, "1")
+            code, _, err = self.run_cli(
+                "-n", "-p", bad, "-h", self.tx.host, "1"
+            )
             self.assertEqual(code, 2, bad)
             self.assertIn("pager must be", err)
         self.assertEqual(self.tx.requests, [])
 
     def test_message_required(self):
-        self.assertEqual(self.run_cli("-n", "-p", "1", "-h", self.tx.host)[0], 2)
+        self.assertEqual(
+            self.run_cli("-n", "-p", "1", "-h", self.tx.host)[0], 2
+        )
 
     def test_bad_numeric_message_not_sent(self):
-        code, _, err = self.run_cli("-n", "-p", "1", "-h", self.tx.host, "CALL", "ME")
+        code, _, err = self.run_cli(
+            "-n", "-p", "1", "-h", self.tx.host, "CALL", "ME"
+        )
         self.assertEqual(code, 2)
         self.assertIn("send text as alpha", err)
         self.assertEqual(self.tx.requests, [])
@@ -197,23 +248,29 @@ class CommandLineTests(unittest.TestCase):
 
     def test_unreachable(self):
         port = self.tx.host.rsplit(":", 1)[1]
-        self.tx.close()   # nothing listens there now
+        self.tx.close()  # nothing listens there now
         self.tx = FakeTransmitter()
-        code, _, err = self.run_cli("-n", "-p", "1", "-h", f"127.0.0.1:{port}", "1")
+        code, _, err = self.run_cli(
+            "-n", "-p", "1", "-h", f"127.0.0.1:{port}", "1"
+        )
         self.assertEqual(code, 1)
         self.assertIn("cannot reach", err)
 
     def test_verbose_shows_request_and_reply(self):
-        code, out, err = self.run_cli("-v", "-n", "-p", "3", "-h", self.tx.host, "555-1212")
+        code, out, err = self.run_cli(
+            "-v", "-n", "-p", "3", "-h", self.tx.host, "555-1212"
+        )
         self.assertEqual(code, 0)
         self.assertIn("from -h/--host", err)
         self.assertIn("GET http://127.0.0.1", err)
         self.assertIn("send_page.php?pager=3&type=1&msg=555-1212", err)
         self.assertIn("reply '!sc1' (HTTP 200)", err)
-        self.assertIn("!sc1", out)   # result line stays on stdout
+        self.assertIn("!sc1", out)  # result line stays on stdout
 
     def test_quiet_without_verbose(self):
-        code, _, err = self.run_cli("-n", "-p", "3", "-h", self.tx.host, "555-1212")
+        code, _, err = self.run_cli(
+            "-n", "-p", "3", "-h", self.tx.host, "555-1212"
+        )
         self.assertEqual((code, err), (0, ""))
 
     def test_transmitter_rejection_is_reported(self):

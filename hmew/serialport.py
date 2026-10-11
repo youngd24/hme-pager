@@ -14,14 +14,15 @@ import logging
 import os
 import select
 import time
-from typing import Optional
 
-from .errors import TransmitterUnreachable
+from .errors import TransmitterUnreachableError
 
 log = logging.getLogger("hmew")
 
 BAUD = 9600
-LOCK_TIMEOUT = 10.0   # seconds to wait for another sender to finish with the port
+LOCK_TIMEOUT = (
+    10.0  # seconds to wait for another sender to finish with the port
+)
 
 
 class Port:
@@ -55,10 +56,14 @@ class PosixPort(Port):
         except OSError as exc:
             hint = ""
             if exc.errno == errno.EACCES:
-                hint = (f"; on Ubuntu/Debian add yourself to the dialout group "
-                        f"(sudo usermod -aG dialout $USER, then log in again), "
-                        f"or check the group with ls -l {device}")
-            raise TransmitterUnreachable(f"cannot open serial port {device}: {exc.strerror}{hint}") from exc
+                hint = (
+                    f"; on Ubuntu/Debian add yourself to the dialout group "
+                    f"(sudo usermod -aG dialout $USER, then log in again), "
+                    f"or check the group with ls -l {device}"
+                )
+            raise TransmitterUnreachableError(
+                f"cannot open serial port {device}: {exc.strerror}{hint}"
+            ) from exc
         try:
             self._lock(lock_timeout)
             self._configure()
@@ -80,32 +85,62 @@ class PosixPort(Port):
                 return
             except BlockingIOError:
                 if time.monotonic() >= deadline:
-                    raise TransmitterUnreachable(
-                        f"serial port {self.device} is in use by another sender "
+                    raise TransmitterUnreachableError(
+                        f"serial port {self.device} is in use by another "
+                        "sender "
                         f"(waited {timeout:.0f} s)"
                     ) from None
                 if not waited:
-                    log.debug("%s is in use by another sender; waiting", self.device)
+                    log.debug(
+                        "%s is in use by another sender; waiting", self.device
+                    )
                     waited = True
                 time.sleep(0.1)
 
     def _configure(self) -> None:
         import termios
 
-        iflag, oflag, cflag, lflag, _ispeed, _ospeed, cc = termios.tcgetattr(self.fd)
-        # Raw mode: no line editing, echo, signals, CR/LF translation or software flow control.
-        iflag &= ~(termios.IGNBRK | termios.BRKINT | termios.PARMRK | termios.ISTRIP
-                   | termios.INLCR | termios.IGNCR | termios.ICRNL
-                   | termios.IXON | termios.IXOFF | termios.IXANY)
+        iflag, oflag, cflag, lflag, _ispeed, _ospeed, cc = termios.tcgetattr(
+            self.fd
+        )
+        # Raw mode: no line editing, echo, signals, CR/LF translation or
+        # software flow control.
+        iflag &= ~(
+            termios.IGNBRK
+            | termios.BRKINT
+            | termios.PARMRK
+            | termios.ISTRIP
+            | termios.INLCR
+            | termios.IGNCR
+            | termios.ICRNL
+            | termios.IXON
+            | termios.IXOFF
+            | termios.IXANY
+        )
         oflag &= ~termios.OPOST
-        lflag &= ~(termios.ECHO | termios.ECHONL | termios.ICANON | termios.ISIG | termios.IEXTEN)
-        # 8 data bits, no parity, 1 stop bit, no hardware flow control, ignore modem lines.
-        cflag &= ~(termios.CSIZE | termios.PARENB | termios.CSTOPB | getattr(termios, "CRTSCTS", 0))
+        lflag &= ~(
+            termios.ECHO
+            | termios.ECHONL
+            | termios.ICANON
+            | termios.ISIG
+            | termios.IEXTEN
+        )
+        # 8 data bits, no parity, 1 stop bit, no hardware flow control,
+        # ignore modem lines.
+        cflag &= ~(
+            termios.CSIZE
+            | termios.PARENB
+            | termios.CSTOPB
+            | getattr(termios, "CRTSCTS", 0)
+        )
         cflag |= termios.CS8 | termios.CREAD | termios.CLOCAL
         cc[termios.VMIN] = 0
         cc[termios.VTIME] = 0
-        termios.tcsetattr(self.fd, termios.TCSANOW,
-                          [iflag, oflag, cflag, lflag, termios.B9600, termios.B9600, cc])
+        termios.tcsetattr(
+            self.fd,
+            termios.TCSANOW,
+            [iflag, oflag, cflag, lflag, termios.B9600, termios.B9600, cc],
+        )
 
     def flush_input(self) -> None:
         import termios
@@ -119,10 +154,12 @@ class PosixPort(Port):
         while view:
             _, ready, _ = select.select([], [self.fd], [], 5.0)
             if not ready:
-                raise TransmitterUnreachable(f"serial port {self.device}: write timed out")
+                raise TransmitterUnreachableError(
+                    f"serial port {self.device}: write timed out"
+                )
             n = os.write(self.fd, view)
             view = view[n:]
-        termios.tcdrain(self.fd)   # wait until the bytes have actually gone out
+        termios.tcdrain(self.fd)  # wait until the bytes have actually gone out
 
     def read(self, timeout: float) -> bytes:
         ready, _, _ = select.select([self.fd], [], [], max(0.0, timeout))
@@ -135,28 +172,42 @@ class PosixPort(Port):
 
     def close(self) -> None:
         if self.fd is not None:
-            os.close(self.fd)   # also releases the lock
+            os.close(self.fd)  # also releases the lock
             self.fd = None
 
 
 class PySerialPort(Port):
-    """Fallback for platforms without termios (Windows). Needs the pyserial package."""
+    """Fallback for platforms without termios (Windows). Needs pyserial."""
 
     def __init__(self, device: str):
         try:
             import serial  # pyserial
         except ImportError:
-            raise TransmitterUnreachable(
+            raise TransmitterUnreachableError(
                 "serial sending on this platform needs the pyserial package "
                 "(pip install pyserial); on Linux it works without it"
             ) from None
         self.device = device
         try:
-            self.s = serial.Serial(device, BAUD, bytesize=8, parity="N", stopbits=1,
-                                   rtscts=False, xonxoff=False, timeout=0.2)
+            self.s = serial.Serial(
+                device,
+                BAUD,
+                bytesize=8,
+                parity="N",
+                stopbits=1,
+                rtscts=False,
+                xonxoff=False,
+                timeout=0.2,
+            )
         except serial.SerialException as exc:
-            raise TransmitterUnreachable(f"cannot open serial port {device}: {exc}") from exc
-        log.debug("opened %s at %d baud, 8N1, no flow control (pyserial)", device, BAUD)
+            raise TransmitterUnreachableError(
+                f"cannot open serial port {device}: {exc}"
+            ) from exc
+        log.debug(
+            "opened %s at %d baud, 8N1, no flow control (pyserial)",
+            device,
+            BAUD,
+        )
 
     def flush_input(self) -> None:
         self.s.reset_input_buffer()

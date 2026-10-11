@@ -2,6 +2,22 @@
 
 Releases of the whole repo, tagged in git. Capcoder's own detailed changes are in [capcoder/CHANGELOG.md](capcoder/CHANGELOG.md).
 
+## Unreleased
+
+**Code style: PEP 8**
+- All Python code (`hmew`, `pager.py`, `capcoder`, tests) now meets PEP 8, including its 79-character line limit. `pycodestyle` reports nothing.
+- The formatting was done with `black`, and long strings and comments were wrapped by hand. Help text, messages and behavior are unchanged.
+- **Exception names now end in `Error`, as PEP 8 asks:**
+  - `TransmitterUnreachableError`
+  - `NoReplyError`
+  - `UnexpectedReplyError`
+  - `PageRejectedError`
+  - `QueueFullError`
+
+  The old names still work as aliases, so existing code doesn't break.
+- `do_GET`/`do_POST` keep their names, because Python's `http.server` requires them.
+- Removed an unused import.
+
 ## 0.3 (2026-10-11), git tag `v0.3`
 
 Tested on the real unit: with defaults from `config.example`, pages went out over both serial and the network and were received on Capcoder.

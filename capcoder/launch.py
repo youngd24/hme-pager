@@ -25,7 +25,10 @@ WINDOW_SIZE = (880, 760)
 
 def _candidates() -> list[str]:
     if sys.platform == "win32":
-        roots = [os.environ.get(v) for v in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+        roots = [
+            os.environ.get(v)
+            for v in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")
+        ]
         rel = [
             r"Microsoft\Edge\Application\msedge.exe",
             r"Google\Chrome\Application\chrome.exe",
@@ -38,14 +41,22 @@ def _candidates() -> list[str]:
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             "/Applications/Chromium.app/Contents/MacOS/Chromium",
         ]
-    names = ("microsoft-edge", "microsoft-edge-stable", "google-chrome", "google-chrome-stable",
-             "chromium", "chromium-browser")
+    names = (
+        "microsoft-edge",
+        "microsoft-edge-stable",
+        "google-chrome",
+        "google-chrome-stable",
+        "chromium",
+        "chromium-browser",
+    )
     return [p for p in (shutil.which(n) for n in names) if p]
 
 
 def find_app_browser(explicit: Optional[str] = None) -> Optional[str]:
     if explicit:
-        return shutil.which(explicit) or (explicit if Path(explicit).is_file() else None)
+        return shutil.which(explicit) or (
+            explicit if Path(explicit).is_file() else None
+        )
     return next((c for c in _candidates() if Path(c).is_file()), None)
 
 
@@ -59,14 +70,28 @@ def open_ui(url: str, mode: str, browser: Optional[str] = None) -> None:
             w, h = WINDOW_SIZE
             cmd = [exe, f"--app={url}", f"--window-size={w},{h}"]
             try:
-                subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL, close_fds=True)
+                subprocess.Popen(
+                    cmd,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    close_fds=True,
+                )
                 log.info("opened pager window with %s", exe)
                 return
             except OSError as e:
-                log.warning("could not start %s (%s); opening a browser tab instead", exe, e)
+                log.warning(
+                    "could not start %s (%s); opening a browser tab instead",
+                    exe,
+                    e,
+                )
         elif browser:
-            log.warning("browser %r not found; opening a browser tab instead", browser)
+            log.warning(
+                "browser %r not found; opening a browser tab instead", browser
+            )
         else:
-            log.info("no Edge/Chrome/Chromium found for a separate window; opening a browser tab")
+            log.info(
+                "no Edge/Chrome/Chromium found for a separate window; "
+                "opening a browser tab"
+            )
     webbrowser.open(url)

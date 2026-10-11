@@ -16,11 +16,12 @@ from .errors import ValidationError
 MAX_PAGERS_PER_REQUEST = 9
 PAGER_MIN, PAGER_MAX = 1, 999
 BEEP_MIN, BEEP_MAX = 1, 4
-NUMERIC_MAX_LEN = 20      # stated in the Scope section
-ALPHA_MAX_BYTES = 128     # stated in the HTTP section
+NUMERIC_MAX_LEN = 20  # stated in the Scope section
+ALPHA_MAX_BYTES = 128  # stated in the HTTP section
 
-# Digits, space, hyphen, square brackets, and 'U' (urgent) per the Scope section.
-_NUMERIC_RE = re.compile(r"[0-9 \-\[\]U]")   # one allowed character
+# Digits, space, hyphen, square brackets, and 'U' (urgent), per the Scope
+# section.
+_NUMERIC_RE = re.compile(r"[0-9 \-\[\]U]")  # one allowed character
 
 
 class PageType(enum.IntEnum):
@@ -42,7 +43,8 @@ def validate_pagers(pager: PagerArg) -> List[int]:
         raise ValidationError("at least one pager number is required")
     if len(items) > MAX_PAGERS_PER_REQUEST:
         raise ValidationError(
-            f"at most {MAX_PAGERS_PER_REQUEST} pagers per request, got {len(items)}"
+            f"at most {MAX_PAGERS_PER_REQUEST} pagers per request, "
+            f"got {len(items)}"
         )
     for p in items:
         if isinstance(p, bool) or not isinstance(p, int):
@@ -58,7 +60,9 @@ def validate_beep(beep: int) -> int:
     if isinstance(beep, bool) or not isinstance(beep, int):
         raise ValidationError(f"beep must be an int, got {beep!r}")
     if not BEEP_MIN <= beep <= BEEP_MAX:
-        raise ValidationError(f"beep must be {BEEP_MIN}-{BEEP_MAX}, got {beep}")
+        raise ValidationError(
+            f"beep must be {BEEP_MIN}-{BEEP_MAX}, got {beep}"
+        )
     return beep
 
 
@@ -80,10 +84,14 @@ def validate_message(msg: str, page_type: PageType) -> str:
     if page_type is PageType.VIBE_NUMERIC:
         bad = [c for c in msg if not _NUMERIC_RE.fullmatch(c)]
         if bad:
-            hint = " (send text as alpha)" if any(c.isalpha() for c in bad) else ""
+            hint = (
+                " (send text as alpha)"
+                if any(c.isalpha() for c in bad)
+                else ""
+            )
             raise ValidationError(
-                "numeric message may only contain digits, space, '-', '[', ']' and 'U'; "
-                f"found {_describe(bad)}{hint}"
+                "numeric message may only contain digits, space, "
+                f"'-', '[', ']' and 'U'; found {_describe(bad)}{hint}"
             )
         if len(msg) > NUMERIC_MAX_LEN:
             raise ValidationError(
@@ -95,8 +103,8 @@ def validate_message(msg: str, page_type: PageType) -> str:
         bad = [c for c in msg if not " " <= c <= "~"]
         if bad:
             raise ValidationError(
-                "alpha message may only contain printable ASCII (letters, digits, "
-                f"punctuation, space); found {_describe(bad)}"
+                "alpha message may only contain printable ASCII (letters, "
+                f"digits, punctuation, space); found {_describe(bad)}"
             )
         n = len(msg.encode("ascii"))
         if n > ALPHA_MAX_BYTES:
@@ -108,13 +116,13 @@ def validate_message(msg: str, page_type: PageType) -> str:
 
 @dataclass(frozen=True)
 class SendResult:
-    code: str      # status letter, e.g. "c" for OK
-    count: int     # pagers processed
-    raw: str       # raw reply, e.g. "!sc1"
+    code: str  # status letter, e.g. "c" for OK
+    count: int  # pagers processed
+    raw: str  # raw reply, e.g. "!sc1"
 
 
 CAPCODE_MIN, CAPCODE_MAX = 8, 2097143
-BASE_MIN, BASE_MAX = 0, 209   # base*10000 + pager*8 must stay a valid capcode
+BASE_MIN, BASE_MAX = 0, 209  # base*10000 + pager*8 must stay a valid capcode
 # Capcodes the transmitter rejects, per the protocol doc (Waveware error 03):
 # 0-7, 2007664-2007671, 2045056-2045063, 2097144 and up.
 _RESERVED_CAPCODES = (range(2007664, 2007672), range(2045056, 2045064))
@@ -123,10 +131,12 @@ _RESERVED_CAPCODES = (range(2007664, 2007672), range(2045056, 2045064))
 def validate_capcode(capcode: int) -> int:
     if isinstance(capcode, bool) or not isinstance(capcode, int):
         raise ValidationError(f"capcode must be an int, got {capcode!r}")
-    if not CAPCODE_MIN <= capcode <= CAPCODE_MAX or any(capcode in r for r in _RESERVED_CAPCODES):
+    if not CAPCODE_MIN <= capcode <= CAPCODE_MAX or any(
+        capcode in r for r in _RESERVED_CAPCODES
+    ):
         raise ValidationError(
-            f"capcode {capcode:07d} is not valid (the transmitter rejects 0-7, "
-            "2007664-2007671, 2045056-2045063 and 2097144 up)"
+            f"capcode {capcode:07d} is not valid (the transmitter rejects "
+            "0-7, 2007664-2007671, 2045056-2045063 and 2097144 up)"
         )
     return capcode
 
@@ -135,7 +145,9 @@ def validate_base(base: int) -> int:
     if isinstance(base, bool) or not isinstance(base, int):
         raise ValidationError(f"base ID must be an int, got {base!r}")
     if not BASE_MIN <= base <= BASE_MAX:
-        raise ValidationError(f"base ID must be {BASE_MIN:03d}-{BASE_MAX:03d}, got {base}")
+        raise ValidationError(
+            f"base ID must be {BASE_MIN:03d}-{BASE_MAX:03d}, got {base}"
+        )
     return base
 
 
@@ -151,5 +163,7 @@ def capcode_to_pager(capcode: Union[int, str]) -> int:
     """
     value = int(capcode) % 10000
     if value % 8 != 0:
-        raise ValidationError(f"capcode {capcode} is not a multiple-of-8 pager address")
+        raise ValidationError(
+            f"capcode {capcode} is not a multiple-of-8 pager address"
+        )
     return value // 8

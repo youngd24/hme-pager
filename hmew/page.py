@@ -21,9 +21,9 @@ from .models import (
 class Page:
     """Who to page and what to send.
 
-    Give either ``pagers`` (pager numbers 1-999; HTTP adds the transmitter's base ID,
-    serial needs a base ID to work out the capcode) or ``capcodes`` (full 7-digit
-    capcodes; serial only), not both.
+    Give either ``pagers`` (pager numbers 1-999; HTTP adds the
+    transmitter's base ID, serial needs a base ID to work out the capcode)
+    or ``capcodes`` (full 7-digit capcodes; serial only), not both.
     """
 
     kind: PageType
@@ -35,7 +35,9 @@ class Page:
 
     def check(self) -> "Page":
         if bool(self.pagers) == bool(self.capcodes):
-            raise ValidationError("give pager numbers or capcodes (one of them, not both)")
+            raise ValidationError(
+                "give pager numbers or capcodes (one of them, not both)"
+            )
         if self.pagers:
             validate_pagers(list(self.pagers))
         for c in self.capcodes:

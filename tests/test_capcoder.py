@@ -6,17 +6,29 @@ from pathlib import Path
 
 from capcoder.core import Core, Hub
 from capcoder.decode import parse_line
-from capcoder.store import MAX_LOCKED, MAX_PERSONAL, MAX_SLOTS, Store, StoreError
+from capcoder.store import (
+    MAX_LOCKED,
+    MAX_PERSONAL,
+    MAX_SLOTS,
+    Store,
+    StoreError,
+)
 
 
 def line(capcode=870024, function=1, kind="Alpha", text="555-1212"):
-    return f"POCSAG1200: Address: {capcode:>7}  Function: {function}  {kind}:   {text}<NUL>"
+    return (
+        f"POCSAG1200: Address: {capcode:>7}  "
+        f"Function: {function}  {kind}:   {text}<NUL>"
+    )
 
 
 class DecodeTests(unittest.TestCase):
     def test_alpha(self):
         p = parse_line(line())
-        self.assertEqual((p.capcode, p.function, p.kind, p.text), (870024, 1, "alpha", "555-1212"))
+        self.assertEqual(
+            (p.capcode, p.function, p.kind, p.text),
+            (870024, 1, "alpha", "555-1212"),
+        )
 
     def test_numeric(self):
         p = parse_line(line(function=0, kind="Numeric", text="555 1212"))
@@ -49,7 +61,9 @@ class StoreTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def add(self, text="x"):
-        return self.store.add(parse_line(line(text=text)), datetime.now().astimezone())
+        return self.store.add(
+            parse_line(line(text=text)), datetime.now().astimezone()
+        )
 
     def test_oldest_unlocked_dropped_when_full(self):
         first = self.add("first")
@@ -59,8 +73,8 @@ class StoreTests(unittest.TestCase):
             self.add(f"m{i}")
         ids = [m["id"] for m in self.store.messages]
         self.assertEqual(len(ids), MAX_SLOTS)
-        self.assertIn(first["id"], ids)          # locked, kept
-        self.assertNotIn(second["id"], ids)      # oldest unlocked, dropped
+        self.assertIn(first["id"], ids)  # locked, kept
+        self.assertNotIn(second["id"], ids)  # oldest unlocked, dropped
 
     def test_lock_limit(self):
         msgs = [self.add(str(i)) for i in range(MAX_LOCKED + 1)]
@@ -77,7 +91,9 @@ class StoreTests(unittest.TestCase):
             self.store.apply("file", msgs[-1]["id"])
         for i in range(MAX_SLOTS):
             self.add(f"r{i}")
-        self.assertEqual(sum(m["personal"] for m in self.store.messages), MAX_PERSONAL)
+        self.assertEqual(
+            sum(m["personal"] for m in self.store.messages), MAX_PERSONAL
+        )
 
     def test_settings_validated(self):
         self.store.apply("settings", value={"speaker": "silent"})
@@ -107,21 +123,32 @@ class CoreTests(unittest.TestCase):
         self.store.apply("capcode", value=870024)
         self.hub = Hub()
         self.events = self.hub.subscribe()
-        self.core = Core(self.store, self.hub, dedupe_seconds=10, log_file=None)
+        self.core = Core(
+            self.store, self.hub, dedupe_seconds=10, log_file=None
+        )
 
     def test_filters_by_capcode(self):
-        self.assertEqual(self.core.handle_line(line(capcode=874440), "test"), "ignored: other capcode")
+        self.assertEqual(
+            self.core.handle_line(line(capcode=874440), "test"),
+            "ignored: other capcode",
+        )
         self.assertEqual(self.core.handle_line(line(), "test"), "stored")
         self.assertEqual(len(self.store.messages), 1)
 
     def test_duplicate_suppressed(self):
         self.core.handle_line(line(), "test")
-        self.assertEqual(self.core.handle_line(line(), "test"), "ignored: duplicate")
-        self.assertEqual(self.core.handle_line(line(text="other"), "test"), "stored")
+        self.assertEqual(
+            self.core.handle_line(line(), "test"), "ignored: duplicate"
+        )
+        self.assertEqual(
+            self.core.handle_line(line(text="other"), "test"), "stored"
+        )
 
     def test_power_off_ignores(self):
         self.store.apply("power", value=False)
-        self.assertEqual(self.core.handle_line(line(), "test"), "ignored: pager is off")
+        self.assertEqual(
+            self.core.handle_line(line(), "test"), "ignored: pager is off"
+        )
 
     def test_page_event_published(self):
         self.core.handle_line(line(), "test")

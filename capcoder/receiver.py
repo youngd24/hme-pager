@@ -32,11 +32,13 @@ if TYPE_CHECKING:
 log = logging.getLogger("capcoder.receiver")
 mmng_log = logging.getLogger("capcoder.multimon")
 
-IDLE_AFTER = 5.0            # seconds without packets before we call the feed idle
-RESTART_DELAY = 3.0         # seconds before restarting multimon-ng after it exits
-MAX_PIPE_BUFFER = 4 << 20   # bytes queued for multimon-ng before we start dropping audio
+IDLE_AFTER = 5.0  # seconds without packets before we call the feed idle
+RESTART_DELAY = 3.0  # seconds before restarting multimon-ng after it exits
+MAX_PIPE_BUFFER = (
+    4 << 20
+)  # bytes queued for multimon-ng before we start dropping audio
 STATS_EVERY = 60.0
-BIND_RETRY = 5.0            # seconds between attempts to open a busy UDP port
+BIND_RETRY = 5.0  # seconds between attempts to open a busy UDP port
 
 DECODE_MODES = ("alpha", "numeric", "auto", "standard")
 
@@ -45,7 +47,10 @@ EXTRA_DIRS = [r"C:\rtl-sdr"] if sys.platform == "win32" else []
 
 
 def find_binary(binary: str):
-    """Full path to binary: on PATH, as given, or in EXTRA_DIRS. None if not found."""
+    """Full path to binary: on PATH, as given, or in EXTRA_DIRS.
+
+    None if not found.
+    """
     found = shutil.which(binary)
     if found is None and EXTRA_DIRS and os.path.basename(binary) == binary:
         found = shutil.which(binary, path=os.pathsep.join(EXTRA_DIRS))
@@ -57,7 +62,8 @@ def multimon_args(mode: str = "alpha", charset: str = "US") -> list[str]:
     args = ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"]
     if mode != "standard":
         args += ["-f", mode]
-    # mmng-ui also passes -u (prune unlikely POCSAG decodes); left out, it made the output messier here.
+    # mmng-ui also passes -u (prune unlikely POCSAG decodes); left out, it
+    # made the output messier here.
     args += ["-t", "raw", "-q", "--timestamp", "-p", "-C", charset, "-"]
     return args
 
@@ -85,7 +91,9 @@ def _udp_socket(bind: str, port: int) -> socket.socket:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         except (OSError, AttributeError) as e:
-            log.info("IPv6 dual-stack not available (%s), listening on IPv4 only", e)
+            log.info(
+                "IPv6 dual-stack not available (%s), listening on IPv4 only", e
+            )
             if sock is not None:
                 sock.close()
             sock, bind = None, "0.0.0.0"
@@ -116,7 +124,9 @@ class _AudioProtocol(asyncio.DatagramProtocol):
 
 
 class Receiver:
-    def __init__(self, core: "Core", port: int, bind: str, binary: str, args: list[str]):
+    def __init__(
+        self, core: "Core", port: int, bind: str, binary: str, args: list[str]
+    ):
         self.core = core
         self.port = port
         self.bind = bind
@@ -139,7 +149,9 @@ class Receiver:
     # ---- thread control (called from the main thread) ----
 
     def start(self) -> None:
-        self._thread = threading.Thread(target=self._thread_main, name="receiver", daemon=True)
+        self._thread = threading.Thread(
+            target=self._thread_main, name="receiver", daemon=True
+        )
         self._thread.start()
 
     def stop(self) -> None:
@@ -187,30 +199,55 @@ class Receiver:
             log.info("receiver stopped")
 
     async def _listen(self) -> None:
-        """Open the UDP port, retrying until it is free (e.g. another program still holds it)."""
+        """Open the UDP port, retrying until it is free.
+
+        Another program (or another Capcoder) may still hold it.
+        """
         failures = 0
         while not self._stop.is_set():
             try:
                 sock = _udp_socket(self.bind, self.port)
                 self._transport, _ = await self._loop.create_datagram_endpoint(
-                    lambda: _AudioProtocol(self), sock=sock)
+                    lambda: _AudioProtocol(self), sock=sock
+                )
             except OSError as e:
                 failures += 1
                 if failures == 1:
                     log.error(
-                        "cannot listen on UDP port %d: %s. Is another program (or another capcoder) "
-                        "using it? Retrying every %.0f s.", self.port, e, BIND_RETRY)
+                        "cannot listen on UDP port %d: %s. Is another "
+                        "program (or another capcoder) using it? Retrying "
+                        "every %.0f s.",
+                        self.port,
+                        e,
+                        BIND_RETRY,
+                    )
                 else:
-                    log.debug("UDP port %d still unavailable (attempt %d): %s", self.port, failures, e)
-                self.core.set_status(udp=f"port {self.port} in use, retrying", udp_port=self.port)
+                    log.debug(
+                        "UDP port %d still unavailable (attempt %d): %s",
+                        self.port,
+                        failures,
+                        e,
+                    )
+                self.core.set_status(
+                    udp=f"port {self.port} in use, retrying",
+                    udp_port=self.port,
+                )
                 try:
                     await asyncio.wait_for(self._stop.wait(), BIND_RETRY)
                 except asyncio.TimeoutError:
                     pass
                 continue
             if failures:
-                log.info("UDP port %d is free now (after %d failed attempts)", self.port, failures)
-            log.info("listening for audio on UDP port %d (bind %s)", self.port, self.bind)
+                log.info(
+                    "UDP port %d is free now (after %d failed attempts)",
+                    self.port,
+                    failures,
+                )
+            log.info(
+                "listening for audio on UDP port %d (bind %s)",
+                self.port,
+                self.bind,
+            )
             self.core.set_status(udp="idle", udp_port=self.port)
             return
 
@@ -221,12 +258,14 @@ class Receiver:
                 where = " or ".join(["PATH"] + EXTRA_DIRS)
                 log.error(
                     "multimon-ng not found (%r in %s). Pass --mmng PATH. "
-                    "Decoding is off until it is found; injected test pages still work.",
-                    self.binary, where,
+                    "Decoding is off until it is found; injected test "
+                    "pages still work.",
+                    self.binary,
+                    where,
                 )
                 self._warned_missing = True
             self.core.set_status(decoder="missing")
-            try:   # look again in ~10 s, counting the restart delay in _main
+            try:  # look again in ~10 s, counting the restart delay in _main
                 await asyncio.wait_for(self._stop.wait(), 10 - RESTART_DELAY)
             except asyncio.TimeoutError:
                 pass
@@ -235,7 +274,9 @@ class Receiver:
 
         log.info("starting multimon-ng: %s %s", exe, " ".join(self.args))
         try:
-            proc = await asyncio.create_subprocess_exec(exe, *self.args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            proc = await asyncio.create_subprocess_exec(
+                exe, *self.args, stdin=PIPE, stdout=PIPE, stderr=PIPE
+            )
         except OSError as e:
             log.error("could not start multimon-ng: %s", e)
             self.core.set_status(decoder="error")
@@ -244,12 +285,16 @@ class Receiver:
         log.info("multimon-ng running, pid %d", proc.pid)
         self.core.set_status(decoder="running")
 
-        pumps = asyncio.ensure_future(asyncio.gather(
-            self._pump(proc.stdout, self._on_stdout),
-            self._pump(proc.stderr, self._on_stderr),
-        ))
+        pumps = asyncio.ensure_future(
+            asyncio.gather(
+                self._pump(proc.stdout, self._on_stdout),
+                self._pump(proc.stderr, self._on_stderr),
+            )
+        )
         stopper = asyncio.ensure_future(self._stop.wait())
-        await asyncio.wait({pumps, stopper}, return_when=asyncio.FIRST_COMPLETED)
+        await asyncio.wait(
+            {pumps, stopper}, return_when=asyncio.FIRST_COMPLETED
+        )
         if stopper.done() and proc.returncode is None:
             proc.kill()
         stopper.cancel()
@@ -262,7 +307,11 @@ class Receiver:
         if self._stop.is_set():
             log.info("multimon-ng stopped")
         else:
-            log.warning("multimon-ng exited with code %s; restarting in %.0f s", rc, RESTART_DELAY)
+            log.warning(
+                "multimon-ng exited with code %s; restarting in %.0f s",
+                rc,
+                RESTART_DELAY,
+            )
             self.core.set_status(decoder="exited")
 
     async def _pump(self, stream: asyncio.StreamReader, handle) -> None:
@@ -326,6 +375,9 @@ class Receiver:
             if now - last_stats >= STATS_EVERY:
                 last_stats = now
                 log.debug(
-                    "audio stats: %d packets, %d bytes, %d dropped since start",
-                    self.packets, self.bytes, self.dropped,
+                    "audio stats: %d packets, %d bytes, %d dropped "
+                    "since start",
+                    self.packets,
+                    self.bytes,
+                    self.dropped,
                 )

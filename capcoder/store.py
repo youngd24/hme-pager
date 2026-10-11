@@ -21,13 +21,21 @@ log = logging.getLogger("capcoder.store")
 MAX_SLOTS = 19
 MAX_LOCKED = 10
 MAX_PERSONAL = 10
-MAX_CAPCODE = 2_097_151   # POCSAG addresses are 21 bits
+MAX_CAPCODE = 2_097_151  # POCSAG addresses are 21 bits
 
-AUDIBLE_ALERTS = ("escalert", "loud_long", "loud_short", "soft_long", "soft_short", "chirp", "none")
+AUDIBLE_ALERTS = (
+    "escalert",
+    "loud_long",
+    "loud_short",
+    "soft_long",
+    "soft_short",
+    "chirp",
+    "none",
+)
 SILENT_ALERTS = ("chirp_vibrate", "vibrate", "none")
 
 DEFAULT_SETTINGS = {
-    "speaker": "audible",        # audible | silent
+    "speaker": "audible",  # audible | silent
     "audible_alert": "loud_short",
     "silent_alert": "vibrate",
     "alarm_enabled": False,
@@ -37,7 +45,10 @@ DEFAULT_SETTINGS = {
 
 
 class StoreError(Exception):
-    """An action the pager refuses, e.g. lock memory full. The text is shown on the LCD."""
+    """An action the pager refuses, e.g. lock memory full.
+
+    The text is shown on the LCD.
+    """
 
 
 def parse_capcode(value: Any) -> int:
@@ -71,7 +82,9 @@ class Store:
         self.capcode = data.get("capcode")
         self.power = bool(data.get("power", True))
         saved = data.get("settings", {})
-        self.settings.update({k: v for k, v in saved.items() if k in DEFAULT_SETTINGS})
+        self.settings.update(
+            {k: v for k, v in saved.items() if k in DEFAULT_SETTINGS}
+        )
         self.messages = list(data.get("messages", []))
         self._next_id = max((m["id"] for m in self.messages), default=0) + 1
         log.info("loaded %d messages from %s", len(self.messages), self.path)
@@ -102,7 +115,11 @@ class Store:
             }
 
     def add(self, page: Page, received: datetime) -> dict:
-        """Store a page. When the 19 regular locations are full, the oldest unlocked one goes."""
+        """Store a page.
+
+        When the 19 regular locations are full, the oldest unlocked one
+        goes.
+        """
         with self._lock:
             msg = {
                 "id": self._next_id,
@@ -124,12 +141,21 @@ class Store:
                     break
                 self.messages.remove(victim)
                 regular.remove(victim)
-                log.info("memory full, dropped oldest message id=%d text=%r", victim["id"], victim["text"])
+                log.info(
+                    "memory full, dropped oldest message id=%d text=%r",
+                    victim["id"],
+                    victim["text"],
+                )
             self._save()
             return dict(msg)
 
-    def apply(self, action: str, msg_id: Any = None, value: Any = None) -> None:
-        """Run a UI action. Raises StoreError (with LCD-ready text) if refused."""
+    def apply(
+        self, action: str, msg_id: Any = None, value: Any = None
+    ) -> None:
+        """Run a UI action.
+
+        Raises StoreError (with LCD-ready text) if refused.
+        """
         with self._lock:
             if action == "power":
                 self.power = bool(value)
@@ -144,7 +170,11 @@ class Store:
                 elif action == "delete":
                     self.messages.remove(msg)
                 elif action == "lock":
-                    if not msg["locked"] and sum(m["locked"] for m in self.messages) >= MAX_LOCKED:
+                    if (
+                        not msg["locked"]
+                        and sum(m["locked"] for m in self.messages)
+                        >= MAX_LOCKED
+                    ):
                         raise StoreError("LOCK FULL")
                     msg["locked"] = True
                 elif action == "unlock":
@@ -152,7 +182,10 @@ class Store:
                 elif action == "file":
                     if msg["personal"]:
                         raise StoreError("ALREADY FILED")
-                    if sum(m["personal"] for m in self.messages) >= MAX_PERSONAL:
+                    if (
+                        sum(m["personal"] for m in self.messages)
+                        >= MAX_PERSONAL
+                    ):
                         raise StoreError("FILE FULL")
                     msg["personal"] = True
             else:
@@ -178,8 +211,10 @@ class Store:
             and new["audible_alert"] in AUDIBLE_ALERTS
             and new["silent_alert"] in SILENT_ALERTS
             and isinstance(new["alarm_enabled"], bool)
-            and isinstance(new["alarm_hour"], int) and 0 <= new["alarm_hour"] <= 23
-            and isinstance(new["alarm_minute"], int) and 0 <= new["alarm_minute"] <= 59
+            and isinstance(new["alarm_hour"], int)
+            and 0 <= new["alarm_hour"] <= 23
+            and isinstance(new["alarm_minute"], int)
+            and 0 <= new["alarm_minute"] <= 59
         )
         if not ok:
             raise StoreError("BAD SETTINGS")

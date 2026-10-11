@@ -1,4 +1,8 @@
-"""Logging: everything at DEBUG to a rotating file, INFO (or DEBUG with -v) to the console."""
+"""Logging setup and the per-OS data directory.
+
+Everything goes to a rotating file at DEBUG; the console gets INFO (or
+DEBUG with -v).
+"""
 
 from __future__ import annotations
 
@@ -10,19 +14,26 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 
-FORMAT = "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)s [%(threadName)s] %(message)s"
+FORMAT = (
+    "%(asctime)s.%(msecs)03d %(levelname)-7s %(name)s [%(threadName)s] "
+    "%(message)s"
+)
 DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
 def _data_dir(name: str) -> Path:
     if sys.platform == "win32":
-        # Not %LOCALAPPDATA%: Microsoft Store Python silently redirects writes there into
-        # its package sandbox, so the printed path would never exist.
+        # Not %LOCALAPPDATA%: Microsoft Store Python silently redirects
+        # writes there into its package sandbox, so the printed path would
+        # never exist.
         return Path.home() / f".{name}"
     if sys.platform == "darwin":
         base = Path.home() / "Library" / "Application Support"
     else:
-        base = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state")
+        base = Path(
+            os.environ.get("XDG_STATE_HOME")
+            or Path.home() / ".local" / "state"
+        )
     return base / name
 
 
@@ -41,15 +52,23 @@ def migrate_old_data_dir() -> Optional[str]:
     try:
         shutil.move(str(old), str(new))
     except OSError as e:
-        return f"could not move old data directory {old} to {new}: {e}; starting fresh"
-    return f"moved data directory from {old} to {new} (vpager was renamed to capcoder)"
+        return (
+            f"could not move old data directory {old} to {new}: {e}; "
+            "starting fresh"
+        )
+    return (
+        f"moved data directory from {old} to {new} "
+        "(vpager was renamed to capcoder)"
+    )
 
 
 def setup_logging(log_file: Path, verbose: bool) -> None:
     log_file.parent.mkdir(parents=True, exist_ok=True)
     fmt = logging.Formatter(FORMAT, DATEFMT)
 
-    file_handler = RotatingFileHandler(log_file, maxBytes=5_000_000, backupCount=5, encoding="utf-8")
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=5_000_000, backupCount=5, encoding="utf-8"
+    )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(fmt)
 

@@ -1,4 +1,6 @@
-"""Tests for ~/.hme-pager/config: the loader and how pager.py combines it with options.
+"""Tests for ~/.hme-pager/config.
+
+Covers the loader and how pager.py combines it with options.
 
 Uses temporary files only; the real ~/.hme-pager/config is never read.
 """
@@ -45,13 +47,22 @@ class LoaderTests(unittest.TestCase):
         )
         self.assertEqual(
             (s.mode, s.host, s.serial_port, s.base, s.type, s.verbose),
-            ("serial", "192.168.1.100:8080", "/dev/ttyS0", 87, "numeric", True),
+            (
+                "serial",
+                "192.168.1.100:8080",
+                "/dev/ttyS0",
+                87,
+                "numeric",
+                True,
+            ),
         )
         self.assertEqual(s.path, self.path)
 
     def test_defaults_when_empty(self):
         s = self.load("[pager]\n")
-        self.assertEqual((s.mode, s.host, s.type, s.verbose), (None, None, None, False))
+        self.assertEqual(
+            (s.mode, s.host, s.type, s.verbose), (None, None, None, False)
+        )
 
     def test_missing_default_file_is_fine(self):
         with mock.patch("hmew.config.DEFAULT_PATH", self.path):
@@ -65,7 +76,7 @@ class LoaderTests(unittest.TestCase):
     def test_typos_and_bad_values(self):
         self.bad("[pager]\nhots = x\n", "unknown setting 'hots'")
         self.bad("[pagers]\nhost = x\n", "unknown section [pagers]")
-        self.bad("host = x\n", "cannot read")              # no section header at all
+        self.bad("host = x\n", "cannot read")  # no section header at all
         self.bad("[pager]\nmode = wifi\n", "network or serial")
         self.bad("[pager]\ntype = text\n", "alpha or numeric")
         self.bad("[pager]\nverbose = maybe\n", "true or false")
@@ -104,11 +115,16 @@ class ConfigCommandLineTests(unittest.TestCase):
         code, out, _ = self.run_cli("-p", "3", "Test", "page")
         self.assertEqual(code, 0)
         q = self.tx.last_query()
-        self.assertEqual((q["pager"], q["type"], q["msg"]), ("3", "2", "Test page"))
+        self.assertEqual(
+            (q["pager"], q["type"], q["msg"]), ("3", "2", "Test page")
+        )
         self.assertIn(f"alpha page to pager 3 via network {self.tx.host}", out)
 
     def test_options_override_config(self):
-        self.write("mode = serial\nserial_port = /dev/nowhere\nhost = 192.0.2.1\ntype = alpha\n")
+        self.write(
+            "mode = serial\nserial_port = /dev/nowhere\n"
+            "host = 192.0.2.1\ntype = alpha\n"
+        )
         code, _, _ = self.run_cli("-n", "-p", "3", "-h", self.tx.host, "555")
         self.assertEqual(code, 0)
         self.assertEqual(self.tx.last_query()["type"], "1")
@@ -131,7 +147,10 @@ class ConfigCommandLineTests(unittest.TestCase):
         self.assertIn("or set type in", err)
 
     def test_verbose_from_config_and_quiet_override(self):
-        self.write(f"mode = network\nhost = {self.tx.host}\ntype = alpha\nverbose = true\n")
+        self.write(
+            f"mode = network\nhost = {self.tx.host}\n"
+            "type = alpha\nverbose = true\n"
+        )
         code, _, err = self.run_cli("-p", "3", "x")
         self.assertEqual(code, 0)
         self.assertIn("type alpha (from config)", err)
@@ -141,16 +160,23 @@ class ConfigCommandLineTests(unittest.TestCase):
         self.assertEqual((code, err), (0, ""))
 
     def test_verbose_and_quiet_together(self):
-        code, _, err = self.run_cli("-v", "-q", "-p", "3", "-a", "-h", self.tx.host, "x")
+        code, _, err = self.run_cli(
+            "-v", "-q", "-p", "3", "-a", "-h", self.tx.host, "x"
+        )
         self.assertEqual(code, 2)
         self.assertIn("mutually exclusive", err)
 
     def test_config_option_reads_other_file(self):
         other = Path(self.tmp.name) / "freepbx.conf"
-        self.write(f"mode = network\nhost = {self.tx.host}\ntype = numeric\n", path=other)
+        self.write(
+            f"mode = network\nhost = {self.tx.host}\ntype = numeric\n",
+            path=other,
+        )
         code, _, _ = self.run_cli("--config", str(other), "-p", "3", "555")
         self.assertEqual(code, 0)
-        code, _, err = self.run_cli("--config", str(Path(self.tmp.name) / "missing"), "-p", "3", "555")
+        code, _, err = self.run_cli(
+            "--config", str(Path(self.tmp.name) / "missing"), "-p", "3", "555"
+        )
         self.assertEqual(code, 2)
         self.assertIn("not found", err)
 
