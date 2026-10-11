@@ -1,6 +1,6 @@
 # Mockorola Capcoder changelog
 
-## Unreleased
+## 0.2 (2026-10-11), git tag `v0.2`
 
 - **Renamed vpager to Mockorola Capcoder.**
   - The package and command are now `capcoder` (`python -m capcoder`).
@@ -9,9 +9,10 @@
   - The data directory is now `~/.capcoder` (Windows) or `capcoder` (macOS/Linux). An existing vpager data directory is moved there on first run.
   - Tests moved to `tests/test_capcoder.py`.
 - The pager now opens in its own resizable window by default, using Edge/Chrome/Chromium app mode, rather than a tab in an existing browser window. `--tab` restores the old behavior, and `--browser PATH` picks the browser.
-- If the UDP audio port is busy, vpager now retries every 5 s and takes the port once it is free. Before, it logged an error once and never received audio. While it waits, the status line shows `port N in use, retrying`.
-- Only one copy can run per port on Windows. Both ports are opened for exclusive use. A second vpager on the same HTTP port now exits with "Is vpager already running?" instead of quietly sharing the port.
-- Windows let a dual-stack listener open a UDP port that another program held on IPv4 only, and IPv4 audio would then go to that program. vpager now checks the IPv4 side first and counts the port as busy.
+- If the UDP audio port is busy, Capcoder now retries every 5 s and takes the port once it is free. Before, it logged an error once and never received audio. While it waits, the status line shows `port N in use, retrying`.
+- Only one copy can run per port on Windows. Both ports are opened for exclusive use. A second copy on the same HTTP port now exits with "Is Capcoder already running?" instead of quietly sharing the port.
+- Windows let a dual-stack listener open a UDP port that another program held on IPv4 only, and IPv4 audio would then go to that program. Capcoder now checks the IPv4 side first and counts the port as busy.
+- Docs: the audio input is described as `rtl_fm` piped into netcat (SDR++ isn't used), with a section on sending audio from a separate RTL-SDR machine. The interface's tooltips and disconnect message no longer use em dashes.
 
 ## 0.1 (2026-10-10), git tag `v0.1`
 

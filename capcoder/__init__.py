@@ -6,4 +6,4 @@ the configured capcode are shown in a browser page drawn to look like the pager.
 Stdlib only.
 """
 
-__version__ = "0.1"
+__version__ = "0.2"

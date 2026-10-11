@@ -30,6 +30,7 @@ Other models or firmware versions may behave differently, particularly in their 
 | [`refdocs/`](refdocs/) | Reference documents: the HMEW Integration Protocol and the Motorola Advisor user manual. |
 | [`assets/`](assets/) | Images used in the docs. |
 | [`TODO.md`](TODO.md) | Open items for later. |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each tagged release (current: 0.2). |
 
 ## Sending pages: `pager.py`
 
