@@ -14,6 +14,8 @@ import ipaddress
 import json
 import logging
 import queue
+import socket
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -40,10 +42,19 @@ UI_LEVELS = {"debug": logging.DEBUG, "info": logging.INFO, "warn": logging.WARNI
 class PagerServer(ThreadingHTTPServer):
     daemon_threads = True
     block_on_close = False
+    # HTTPServer turns on SO_REUSEADDR, which on Windows lets a second process bind a
+    # port that is already in use. Off there, plus exclusive use, so a second vpager
+    # fails to start instead of quietly sharing the port.
+    allow_reuse_address = sys.platform != "win32"
 
     def __init__(self, addr, core: Core):
         self.core = core
         super().__init__(addr, Handler)
+
+    def server_bind(self) -> None:
+        if sys.platform == "win32":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 class Handler(BaseHTTPRequestHandler):

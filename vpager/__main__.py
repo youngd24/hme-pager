@@ -1,6 +1,6 @@
 """Command line.
 
-    python -m vpager --capcode 870024            run the pager (opens a browser)
+    python -m vpager --capcode 870024            run the pager (opens its own browser window)
     python -m vpager --base 87 --pager 3         same capcode, from base ID + pager number
     python -m vpager inject "555-1212"           send a fake decode to the running pager
     python -m vpager inject --line "POCSAG1200: Address:  870024  Function: 1  Alpha:   HI"
@@ -16,11 +16,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
-import webbrowser
 from pathlib import Path
 
 from . import __version__
 from .core import Core, Hub
+from .launch import open_ui
 from .logsetup import default_data_dir, setup_logging
 from .receiver import DECODE_MODES, Receiver, multimon_args
 from .server import PagerServer
@@ -62,6 +62,9 @@ def build_parser() -> argparse.ArgumentParser:
     misc = p.add_argument_group("files and UI")
     misc.add_argument("--data-dir", type=Path, help=f"where state and logs go (default {default_data_dir()})")
     misc.add_argument("--log-file", type=Path, help="log file (default <data-dir>/vpager.log)")
+    misc.add_argument("--tab", action="store_true",
+                      help="open the pager in a normal browser tab instead of its own window")
+    misc.add_argument("--browser", help="Edge/Chrome/Chromium binary for the pager window (default: found)")
     misc.add_argument("--no-browser", action="store_true", help="don't open a browser")
     misc.add_argument("-v", "--verbose", action="store_true", help="show debug messages on the console too")
 
@@ -121,7 +124,11 @@ def cmd_run(args) -> int:
     try:
         server = PagerServer((args.http_host, args.http_port), core)
     except OSError as e:
-        log.error("cannot serve the pager page on %s:%d: %s", args.http_host, args.http_port, e)
+        log.error(
+            "cannot serve the pager page on %s:%d: %s. Is vpager already running? "
+            "Stop the other copy, or give this one different ports (--http-port, --udp-port).",
+            args.http_host, args.http_port, e,
+        )
         return 1
     threading.Thread(target=server.serve_forever, name="http", daemon=True).start()
     host = "127.0.0.1" if args.http_host in ("0.0.0.0", "::", "") else args.http_host
@@ -137,8 +144,7 @@ def cmd_run(args) -> int:
         receiver = Receiver(core, args.udp_port, args.udp_bind, args.mmng, mmng)
         receiver.start()
 
-    if not args.no_browser:
-        webbrowser.open(url)
+    open_ui(url, "none" if args.no_browser else "tab" if args.tab else "window", args.browser)
 
     try:
         while True:

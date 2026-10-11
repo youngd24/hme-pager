@@ -1013,7 +1013,8 @@
 
   function renderInfo() {
     const st = S.status || {};
-    const cls = (v, good) => (v === good ? 'ok' : (String(v).startsWith('error') || v === 'missing' || v === 'exited' ? 'bad' : 'warn'));
+    const bad = (v) => /^error|in use/.test(String(v)) || v === 'missing' || v === 'exited';
+    const cls = (v, good) => (v === good ? 'ok' : bad(v) ? 'bad' : 'warn');
     let cap = 'capcode <span class="bad">not set</span>';
     if (S.capcode) {
       const v = S.capcode;

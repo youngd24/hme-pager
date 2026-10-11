@@ -32,7 +32,11 @@ python -m vpager --base 87 --pager 3          # same capcode, from HME base ID +
 python -m vpager --mmng C:\tools\multimon-ng.exe --capcode 870024
 ```
 
-This opens `http://127.0.0.1:8073/` in your browser. Point SDR++'s network sink at UDP port 8888 on this machine. Click the page once so the browser allows sound.
+This opens `http://127.0.0.1:8073/` in its own browser window, separate from your other tabs, so you can size and place it on its own. The page scales the pager to fit the window. vpager uses the app mode of Edge, Chrome or Chromium (`--app=URL`, no tabs or address bar), whichever it finds first; with none of them it falls back to a tab in your default browser. Use `--tab` for a normal tab, or `--browser PATH` to pick the browser.
+
+Point SDR++'s network sink at UDP port 8888 on this machine. Click the page once so the browser allows sound.
+
+Run one copy per set of ports. A second copy on the same HTTP port exits with "Is vpager already running?". If the UDP port is held by another program, such as mmng-ui, vpager shows `port 8888 in use, retrying` and takes the port once it is free.
 
 Once set, the capcode is saved. Later runs remember it, and you can also change it from the pager's own menu.
 
@@ -54,6 +58,8 @@ Once set, the capcode is saved. Later runs remember it, and you can also change 
 | `--no-receiver` | | don't listen for audio; injected pages only |
 | `--data-dir` | see below | where state and logs are kept |
 | `--log-file` | `<data-dir>/vpager.log` | log file |
+| `--tab` | | open in a normal browser tab instead of its own window |
+| `--browser PATH` | found | Edge/Chrome/Chromium binary for the pager window |
 | `--no-browser` | | don't open a browser |
 | `-v` | | show DEBUG messages on the console too |
 
@@ -173,6 +179,7 @@ vpager/
   server.py     local HTTP server: static files, /api/state, /api/events, /api/action,
                 /api/log, /api/inject
   logsetup.py   rotating log file + console, default data directory per OS
+  launch.py     opens the page in its own window (Edge/Chrome/Chromium app mode) or a tab
   web/
     index.html  pager markup
     pager.css   the case, keys, lamp, vibrate animation
@@ -241,4 +248,4 @@ msedge --headless=new --window-size=1000,560 --screenshot=shot.png "http://127.0
 - What sets the function bits: keypad pages have decoded as Function 0, and earlier HTTP pages with `beep=1` as Function 1. It may be the beep setting or how the page was sent.
 - Which Advisor key is Read and which is Function (see Functionality).
 - Does the iStation repeat pages (affects `--dedupe`)?
-- A borderless, pager-shaped desktop window (pywebview) is planned but not built.
+- A borderless, pager-shaped desktop window (pywebview) is planned but not built. For now the page opens in its own app-mode browser window.

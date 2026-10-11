@@ -1,5 +1,12 @@
 # vpager changelog
 
+## Unreleased
+
+- The pager now opens in its own resizable window by default, using Edge/Chrome/Chromium app mode, rather than a tab in an existing browser window. `--tab` restores the old behavior, and `--browser PATH` picks the browser.
+- If the UDP audio port is busy, vpager now retries every 5 s and takes the port once it is free. Before, it logged an error once and never received audio. While it waits, the status line shows `port N in use, retrying`.
+- Only one copy can run per port on Windows. Both ports are opened for exclusive use. A second vpager on the same HTTP port now exits with "Is vpager already running?" instead of quietly sharing the port.
+- Windows let a dual-stack listener open a UDP port that another program held on IPv4 only, and IPv4 audio would then go to that program. vpager now checks the IPv4 side first and counts the port as busy.
+
 ## 0.1 (2026-10-10), git tag `v0.1`
 
 This is the first release. On 2026-10-10 it received a real over-the-air page from the iStation (pager 1, capcode 870008, `5551212`) and displayed it.

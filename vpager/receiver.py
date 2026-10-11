@@ -36,6 +36,7 @@ IDLE_AFTER = 5.0            # seconds without packets before we call the feed id
 RESTART_DELAY = 3.0         # seconds before restarting multimon-ng after it exits
 MAX_PIPE_BUFFER = 4 << 20   # bytes queued for multimon-ng before we start dropping audio
 STATS_EVERY = 60.0
+BIND_RETRY = 5.0            # seconds between attempts to open a busy UDP port
 
 DECODE_MODES = ("alpha", "numeric", "auto", "standard")
 
@@ -61,9 +62,25 @@ def multimon_args(mode: str = "alpha", charset: str = "US") -> list[str]:
     return args
 
 
+def _check_ipv4_free(port: int) -> None:
+    """Raise OSError if something already has the IPv4 side of the port.
+
+    Windows lets a dual-stack socket bind a port that another program holds on
+    IPv4 only; IPv4 audio would then go to that program, not to us.
+    """
+    probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        if sys.platform == "win32":
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        probe.bind(("0.0.0.0", port))
+    finally:
+        probe.close()
+
+
 def _udp_socket(bind: str, port: int) -> socket.socket:
     sock = None
     if bind == "::":
+        _check_ipv4_free(port)
         try:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
             sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
@@ -77,6 +94,9 @@ def _udp_socket(bind: str, port: int) -> socket.socket:
         sock = socket.socket(family, socket.SOCK_DGRAM)
     try:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1 << 20)
+        if sys.platform == "win32":
+            # Stop another program from binding the same port alongside us.
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         sock.bind((bind, port))
     except OSError:
         sock.close()
@@ -106,6 +126,7 @@ class Receiver:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._stop: Optional[asyncio.Event] = None
         self._proc: Optional[asyncio.subprocess.Process] = None
+        self._transport: Optional[asyncio.DatagramTransport] = None
         self._warned_missing = False
         self._receiving = False
         self._sender: Optional[str] = None
@@ -143,16 +164,8 @@ class Receiver:
     async def _main(self) -> None:
         self._loop = asyncio.get_running_loop()
         self._stop = asyncio.Event()
-        transport = None
-        try:
-            sock = _udp_socket(self.bind, self.port)
-            transport, _ = await self._loop.create_datagram_endpoint(lambda: _AudioProtocol(self), sock=sock)
-            log.info("listening for audio on UDP port %d (bind %s)", self.port, self.bind)
-            self.core.set_status(udp="idle", udp_port=self.port)
-        except OSError as e:
-            log.error("cannot listen on UDP port %d: %s", self.port, e)
-            self.core.set_status(udp=f"error: {e.strerror or e}", udp_port=self.port)
-
+        self._transport = None
+        listener = asyncio.create_task(self._listen())
         monitor = asyncio.create_task(self._monitor())
         try:
             while not self._stop.is_set():
@@ -164,13 +177,42 @@ class Receiver:
                 except asyncio.TimeoutError:
                     pass
         finally:
+            listener.cancel()
             monitor.cancel()
-            if transport is not None:
-                transport.close()
+            if self._transport is not None:
+                self._transport.close()
             proc = self._proc
             if proc is not None and proc.returncode is None:
                 proc.kill()
             log.info("receiver stopped")
+
+    async def _listen(self) -> None:
+        """Open the UDP port, retrying until it is free (e.g. another program still holds it)."""
+        failures = 0
+        while not self._stop.is_set():
+            try:
+                sock = _udp_socket(self.bind, self.port)
+                self._transport, _ = await self._loop.create_datagram_endpoint(
+                    lambda: _AudioProtocol(self), sock=sock)
+            except OSError as e:
+                failures += 1
+                if failures == 1:
+                    log.error(
+                        "cannot listen on UDP port %d: %s. Is another program (or another vpager) "
+                        "using it? Retrying every %.0f s.", self.port, e, BIND_RETRY)
+                else:
+                    log.debug("UDP port %d still unavailable (attempt %d): %s", self.port, failures, e)
+                self.core.set_status(udp=f"port {self.port} in use, retrying", udp_port=self.port)
+                try:
+                    await asyncio.wait_for(self._stop.wait(), BIND_RETRY)
+                except asyncio.TimeoutError:
+                    pass
+                continue
+            if failures:
+                log.info("UDP port %d is free now (after %d failed attempts)", self.port, failures)
+            log.info("listening for audio on UDP port %d (bind %s)", self.port, self.bind)
+            self.core.set_status(udp="idle", udp_port=self.port)
+            return
 
     async def _run_decoder(self) -> None:
         exe = find_binary(self.binary)
