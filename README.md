@@ -28,7 +28,7 @@ python pager.py -a -p 3 -h 192.168.1.100 Barcode error aisle 3
 ```
 
 ```
-usage: pager.py (-a | -n) -p N [-h HOST[:PORT]] message ...
+usage: pager.py (-a | -n) -p N [-h HOST[:PORT]] [-v] message ...
 
 Send a numeric or alphanumeric page through the HME/JTECH iStation.
 
@@ -41,13 +41,24 @@ options:
   -p, --pager N         pager number to page, 1-999
   -h, --host HOST[:PORT]
                         transmitter address (default: $HMEWHOST; port defaults to 80)
+  -v, --verbose         show what is sent and what the transmitter replies (on stderr)
   --help                show this help and exit
 
 The host can also come from the HMEWHOST environment variable. The message is everything that isn't an option; several words are joined
 with single spaces (quote it to keep extra spaces). If the message starts with '-', put '--' before it.
 ```
 
-The message is checked before anything is sent. A numeric page may contain only digits, space, `-`, `[`, `]` and `U` (up to 20 characters). An alpha page may contain only printable ASCII (up to 128 characters). Exit status is 0 on success, 2 for a usage or message error, and 1 if the transmitter rejects the page or can't be reached.
+The message is checked before anything is sent. A numeric page may contain only digits, space, `-`, `[`, `]` and `U` (up to 20 characters). An alpha page may contain only printable ASCII (up to 128 characters). Exit status is 0 on success, 2 for a usage or message error, and 1 if the transmitter rejects the page, answers with an HTTP error, or can't be reached.
+
+`-v` shows where the host came from, the exact request URL, and the transmitter's reply and response time:
+
+```
+pager: transmitter 192.168.1.100 port 80 (from -h/--host)
+hmew: numeric page to pager(s) 3 via 192.168.1.100:80: '555-1212' (beep 1, 1200 baud)
+hmew: GET http://192.168.1.100/send_page.php?pager=3&type=1&msg=555-1212&baud=1&beep=1
+hmew: reply '!sc1' (HTTP 200) in 42 ms
+sent numeric page to pager 3: '555-1212' (transmitter replied !sc1)
+```
 
 From Python:
 
@@ -65,7 +76,7 @@ The transmitter takes a **pager number** (1-999) and adds its own base ID to for
 
 ![Mockorola Capcoder showing the idle screen while receiving audio](assets/capcoder.png)
 
-Capcoder listens for raw demodulated audio over UDP, from SDR++ or from `rtl_fm` piped into netcat. It decodes the audio with multimon-ng and shows pages for its capcode on a dot-matrix LCD. The buttons, menus and alerts follow the Advisor's user manual. Every decode, for every capcode, goes to a log file.
+Capcoder listens for raw demodulated audio over UDP, sent by `rtl_fm` piped into netcat. It decodes the audio with multimon-ng and shows pages for its capcode on a dot-matrix LCD. The buttons, menus and alerts follow the Advisor's user manual. Every decode, for every capcode, goes to a log file.
 
 ```
 python -m capcoder --base 87 --pager 3

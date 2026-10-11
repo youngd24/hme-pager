@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import threading
@@ -14,6 +15,7 @@ from typing import Optional
 from .errors import (
     PageRejected,
     QueueFull,
+    TransmitterHTTPError,
     TransmitterUnreachable,
     UnexpectedReply,
     ValidationError,
@@ -29,6 +31,9 @@ from .models import (
 )
 
 _REPLY_RE = re.compile(r"!s([a-z])(\d+)")
+
+# Silent unless the caller configures logging (pager.py -v does).
+log = logging.getLogger("hmew")
 
 
 def parse_reply(raw: str) -> SendResult:
@@ -102,6 +107,12 @@ class PagerClient:
         validate_beep(beep)
         validate_message(msg, page_type)
         url = self.build_url(pagers, page_type, msg, Baud(baud), beep)
+        log.debug(
+            "%s page to pager(s) %s via %s:%s: %r (beep %d, %s baud)",
+            "alpha" if page_type is PageType.ALPHA else "numeric",
+            "+".join(map(str, pagers)), self.host, self.port, msg, beep,
+            "1200" if Baud(baud) is Baud.B1200 else "512",
+        )
 
         last_full: Optional[QueueFull] = None
         for attempt in range(self.retries + 1):
@@ -113,18 +124,37 @@ class PagerClient:
                 # Retrying resends the whole request, which would re-page any
                 # pagers already accepted. Only retry when nothing was accepted.
                 if exc.processed > 0:
+                    log.debug("queue full but %d pager(s) accepted; not retrying", exc.processed)
                     raise
                 last_full = exc
                 if attempt < self.retries:
-                    time.sleep(self.backoff * (2 ** attempt))
+                    delay = self.backoff * (2 ** attempt)
+                    log.debug("queue full (%s); retry %d of %d in %.1f s",
+                              exc.raw, attempt + 1, self.retries, delay)
+                    time.sleep(delay)
         assert last_full is not None
         raise last_full
 
     def _get(self, url: str) -> str:
+        log.debug("GET %s", url)
+        started = time.monotonic()
         try:
             with urllib.request.urlopen(url, timeout=self.timeout) as resp:
-                return resp.read().decode("ascii", errors="replace")
+                raw = resp.read().decode("ascii", errors="replace")
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            # The unit answered; it just wasn't a success. Not a network problem.
+            body = ""
+            try:
+                body = exc.read().decode("ascii", errors="replace")
+            except Exception:
+                pass
+            log.debug("HTTP %s %s from transmitter, body %r", exc.code, exc.reason, body[:200])
+            raise TransmitterHTTPError(exc.code, str(exc.reason), url, body) from exc
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            log.debug("no answer from %s:%s: %s", self.host, self.port, exc)
             raise TransmitterUnreachable(
                 f"cannot reach transmitter at {self.host}:{self.port}: {exc}"
             ) from exc
+        log.debug("reply %r (HTTP %s) in %.0f ms", raw, status, (time.monotonic() - started) * 1000)
+        return raw

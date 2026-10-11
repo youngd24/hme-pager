@@ -8,7 +8,7 @@ Goal: let a FreePBX IVR (or any script) send **numeric** pages to the transmitte
 
 - Transmitter: JTECH/HME iStation (HME Wireless Computer Controlled Paging System), POCSAG at 457.5750 MHz (HME's standard US frequency), 1200 baud default.
 - Transmitter IP on the lab network: 192.168.42.66, port 80 (from the user's curl tests; confirm before hard-coding).
-- Reception/verification rig: RTL-SDR on Windows 10 (Zadig/WinUSB, SDR++, `rtl_fm` piped to `multimon-ng`). Decode command that works:
+- Reception/verification rig: RTL-SDR on Windows 10 (Zadig/WinUSB, `rtl_fm` piped to `multimon-ng`, or to `nc` to feed Capcoder over UDP). Decode command that works:
   `rtl_fm -f 457.5750M -s 22050 -g 30 - | multimon-ng -t raw -a POCSAG1200 -f alpha -`
   Keep the dongle on a long USB cable, away from the transmitter, or the front end overloads.
 - Dev machine: Windows, repo at `C:\Users\youngd\src\hme-pager`. Target runtime: FreePBX (Linux, system Python 3).
@@ -68,7 +68,9 @@ c.send_numeric(pager=[1, 2, 3], msg="42", beep=2)  # group page
 
 Decisions:
 - **Validate before sending.** Bad input raises `ValidationError` locally so a typo in the IVR can't become a stray page.
-- **Reply handling.** `!sc` returns `SendResult`. `!sd/!se/!sf/!sh` raise `PageRejected` (request was built wrong, not retryable). `!sg` raises `QueueFull`. Anything else raises `UnexpectedReply` with the raw text. Network failures raise `TransmitterUnreachable`.
+- **Reply handling.** `!sc` returns `SendResult`. `!sd/!se/!sf/!sh` raise `PageRejected` (request was built wrong, not retryable). `!sg` raises `QueueFull`. Anything else raises `UnexpectedReply` with the raw text (reply parsing stays strict on purpose: the unit's PHP is rough, and the user prefers not to loosen it). An HTTP error status (404, 500, ...) raises `TransmitterHTTPError` (the unit answered); only no answer at all raises `TransmitterUnreachable`.
+- **Logging.** `hmew` logs to the `hmew` logger at DEBUG (page summary, request URL, reply with HTTP status and time, queue-full retries) and is silent unless the app configures logging. `pager.py -v` sends it to stderr. No log file for the sender (user's choice).
+- **Not doing:** beep/baud/group options in `pager.py` (the user says the transmitter and pagers don't need more than the defaults). Cross-process locking is deferred to the FreePBX work.
 - **Queue-full retries.** Retry with exponential backoff only when `processed == 0`. If some pagers were accepted, raise `QueueFull` with `.processed` set, because resending the whole request would page those pagers twice.
 - **Serialized sends.** A `threading.Lock` around each request, since the doc describes a small input buffer and concurrent behavior is unknown.
 - **URL building.** `pager` is built by hand so the `+` separator isn't escaped; everything else goes through `urllib.parse.urlencode`.
@@ -76,7 +78,7 @@ Decisions:
 ## Status
 
 - Package written and smoke-tested against a local fake HTTP server (URL shape, every reply code, retry rules, validation, unreachable host, capcode helpers). **Not yet tested against the real iStation.**
-- Command line: `pager.py` at the repo root. `python pager.py (-a|--alpha | -n|--numeric) -p|--pager N [-h|--host HOST[:PORT]] message...`. `-a`/`-n` are mutually exclusive and one is required; `-h` is host, so help is `--help` only; host falls back to `HMEWHOST` (also accepts `host:port`); the message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors.
+- Command line: `pager.py` at the repo root. `python pager.py (-a|--alpha | -n|--numeric) -p|--pager N [-h|--host HOST[:PORT]] [-v|--verbose] message...`. `-a`/`-n` are mutually exclusive and one is required; `-h` is host, so help is `--help` only; host falls back to `HMEWHOST` (also accepts `host:port`); the message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors.
 - Message checks (`models.validate_message`): numeric = only digits, space, `-`, `[`, `]`, `U`, max 20 (empty allowed: type 1 is also "vibe only"); alpha = printable ASCII only (no control chars), not empty/all spaces, max 128 bytes. Errors name the offending characters.
 - Tests: `tests/test_hmew.py` (message checks + CLI against a fake transmitter on 127.0.0.1).
 - Not written yet: the FreePBX AGI wrapper (set aside for later), packaging.
@@ -99,7 +101,7 @@ Target approach: replace `CURL()` with a Python AGI script that imports this pac
 
 Receive side: a Motorola Advisor-style pager in the browser that answers to one capcode. Stdlib only. Version 0.1 (tag `v0.1`, 2026-10-10): first real over-the-air page received and shown (released as "vpager"; renamed to Mockorola Capcoder after). Badge: MOCKOROLA / CAPCODER, a parody, so no Motorola name or logo on the case. Bump `capcoder/__init__.py` `__version__` and add a `capcoder/CHANGELOG.md` entry for each new tag.
 
-- Audio in: raw UDP on 8888 (same SDR++ network-sink stream mmng-ui takes), piped into multimon-ng. multimon-ng is found on PATH, then in `C:\rtl-sdr` on Windows (`receiver.EXTRA_DIRS`). Uses mmng-ui's multimon-ng flags (POCSAG only) minus `-u`. `C:\rtl-sdr` holds `multimon-ng.exe` (reports 1.3.0) and `multimon-ng_1.61.exe` (reports 1.6.0); the bare-name lookup finds only the former, so use `--mmng` for 1.6.0 unless it's renamed. `-u` was tried with both builds; the user found the output messier with it (stray address-only decodes for random capcodes), so it stays out. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
+- Audio in: raw UDP on 8888, sent by `rtl_fm ... | nc -u <host> 8888` from the RTL-SDR machine (the same raw-audio input mmng-ui takes), piped into multimon-ng. SDR++ is not used anywhere in this project. multimon-ng is found on PATH, then in `C:\rtl-sdr` on Windows (`receiver.EXTRA_DIRS`). Uses mmng-ui's multimon-ng flags (POCSAG only) minus `-u`. `C:\rtl-sdr` holds `multimon-ng.exe` (reports 1.3.0) and `multimon-ng_1.61.exe` (reports 1.6.0); the bare-name lookup finds only the former, so use `--mmng` for 1.6.0 unless it's renamed. `-u` was tried with both builds; the user found the output messier with it (stray address-only decodes for random capcodes), so it stays out. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
 - `decode.py` parses multimon-ng POCSAG lines; `core.py` does capcode filter + duplicate suppression and pushes server-sent events; `store.py` holds memory per the Advisor manual (`refdocs/advisor_inst.pdf`): 19 slots, 10 locked, Personal Message File of 10.
 - `web/` is the pager face (canvas 5x7 dot-matrix LCD, 4x20) and the button state machine.
 - Log: everything at DEBUG to `<data-dir>/capcoder.log` (rotating), including every multimon-ng line, filter verdicts, UDP start/stop, and browser key presses/errors via `/api/log`. Data dir defaults to `%USERPROFILE%\.capcoder` on Windows (an old `~/.vpager` is moved there on first run), deliberately not `%LOCALAPPDATA%`: the user's Python is the Microsoft Store build, which silently redirects AppData writes into its package sandbox (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.13_*\LocalCache\Local\...`).

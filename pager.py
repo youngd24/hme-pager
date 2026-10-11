@@ -8,12 +8,15 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from typing import Optional
 
 from hmew import PagerClient, PagerError, PageType, ValidationError
 from hmew.models import PAGER_MAX, PAGER_MIN, validate_message
+
+log = logging.getLogger("pager")
 
 
 def pager_number(text: str) -> int:
@@ -48,7 +51,7 @@ class Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     p = Parser(
         prog="pager.py",
-        usage="%(prog)s (-a | -n) -p N [-h HOST[:PORT]] message ...",
+        usage="%(prog)s (-a | -n) -p N [-h HOST[:PORT]] [-v] message ...",
         description="Send a numeric or alphanumeric page through the HME/JTECH iStation.",
         add_help=False,   # -h is --host here; help is --help only
         epilog=(
@@ -65,6 +68,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help=f"pager number to page, {PAGER_MIN}-{PAGER_MAX}")
     p.add_argument("-h", "--host", metavar="HOST[:PORT]",
                    help="transmitter address (default: $HMEWHOST; port defaults to 80)")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="show what is sent and what the transmitter replies (on stderr)")
     p.add_argument("--help", action="help", help="show this help and exit")
     p.add_argument("message", nargs="+", help="the message to send")
     return p
@@ -73,6 +78,24 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[list] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if not args.verbose:
+        return _run(parser, args)
+    # Verbose: debug messages from this script and the hmew library go to stderr.
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
+    loggers = [logging.getLogger("pager"), logging.getLogger("hmew")]
+    for lg in loggers:
+        lg.setLevel(logging.DEBUG)
+        lg.addHandler(handler)
+    try:
+        return _run(parser, args)
+    finally:
+        for lg in loggers:
+            lg.removeHandler(handler)
+            lg.setLevel(logging.NOTSET)
+
+
+def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
     if args.alpha and args.numeric:
         parser.error("-a/--alpha and -n/--numeric are mutually exclusive; use one")
     if not (args.alpha or args.numeric):
@@ -94,6 +117,7 @@ def main(argv: Optional[list] = None) -> int:
         print(f"error: no transmitter host; use -h/--host or set HMEWHOST\n{HELP_HINT}", file=sys.stderr)
         return 2
     host, port = split_host(host_text)
+    log.debug("transmitter %s port %d (from %s)", host, port, "-h/--host" if args.host else "HMEWHOST")
     try:
         client = PagerClient(host, port=port)
         if args.alpha:

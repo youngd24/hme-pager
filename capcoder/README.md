@@ -7,7 +7,7 @@ Mockorola Capcoder ("Capcoder" for short; the package and command are `capcoder`
 It is the receive side of this repo. `hmew` sends pages through the HME/JTECH iStation transmitter; Capcoder receives them off the air through an RTL-SDR and shows the ones meant for "its" pager.
 
 ```
-iStation ──RF 457.575 MHz──▶ RTL-SDR ──▶ SDR++ ──UDP audio :8888──▶ Capcoder ──▶ browser
+iStation ──RF 457.575 MHz──▶ RTL-SDR ──▶ rtl_fm | nc ──UDP audio :8888──▶ Capcoder ──▶ browser
                                                                     │
                                                                     └─ multimon-ng (decoder)
 ```
@@ -20,7 +20,7 @@ Python 3, standard library only. The pager face is a single local web page, so i
 
 - Python 3.9 or newer (developed and tested on 3.13).
 - [multimon-ng](https://github.com/EliasOenal/multimon-ng). Capcoder looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with multimon-ng 1.3.0 and 1.6.0 on Windows.
-- Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. The SDR++ network sink does this, with the same settings mmng-ui uses, and so does `rtl_fm` piped into netcat (see "Sending audio from an RTL-SDR machine" below).
+- Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. `rtl_fm` piped into netcat does this; see "Sending audio from an RTL-SDR machine" below.
 
 ### Run
 
@@ -34,7 +34,7 @@ python -m capcoder --mmng C:\tools\multimon-ng.exe --capcode 870024
 
 This opens `http://127.0.0.1:8073/` in its own browser window, separate from your other tabs, so you can size and place it on its own. The page scales the pager to fit the window. Capcoder uses the app mode of Edge, Chrome or Chromium (`--app=URL`, no tabs or address bar), whichever it finds first; with none of them it falls back to a tab in your default browser. Use `--tab` for a normal tab, or `--browser PATH` to pick the browser.
 
-Point SDR++'s network sink, or the `rtl_fm` command below, at UDP port 8888 on this machine. Click the page once so the browser allows sound.
+Point the `rtl_fm` command below at UDP port 8888 on this machine. Click the page once so the browser allows sound.
 
 Run one copy per set of ports. A second copy on the same HTTP port exits with "Is Capcoder already running?". If the UDP port is held by another program, such as mmng-ui, Capcoder shows `port 8888 in use, retrying` and takes the port once it is free.
 
@@ -175,7 +175,7 @@ Hold On/Reset to show `PUSH FOR OFF`, then press Function to turn the pager off.
 - **The browser draws the face; Python does the receiving.** Standard desktop GUI toolkits tend to look dated, and the pager is mostly timing: flashing symbols, 4 s scroll, 12 s alerts, 1 s holds. That runs smoothly in the browser. Python handles the parts that need the machine: UDP, the multimon-ng subprocess, filtering, storage and logging. Because it's a web page, it also works on any OS and can be viewed from another device with `--http-host 0.0.0.0`.
 - **Not Streamlit.** Streamlit reruns the whole script on the server for every click and has no clean way to push an incoming page to the browser. That makes timed button behavior laggy, and the custom drawing would have to live in an HTML component anyway.
 - **Standard library only.** `http.server` serves the page and server-sent events, `asyncio` runs UDP and the subprocess, and `logging` writes the log file. The same rule applies to the rest of the repo.
-- **Same input as mmng-ui.** Capcoder listens on UDP 8888 for the raw audio SDR++ already sends. The UDP-to-multimon-ng code is adapted from [mmng-ui](https://github.com/lingfish/mmng-ui), which is GPL-3.0 like this repo; attribution and a list of changes are in the header of `receiver.py`. Only one program can listen on a given port, so to run both, give Capcoder or mmng-ui a different port and add a second sink.
+- **Same input as mmng-ui.** Capcoder listens on UDP 8888 for raw demodulated audio, the same input mmng-ui takes. The UDP-to-multimon-ng code is adapted from [mmng-ui](https://github.com/lingfish/mmng-ui), which is GPL-3.0 like this repo; attribution and a list of changes are in the header of `receiver.py`. Only one program can listen on a given port, so to run both, give Capcoder or mmng-ui a different port and send the audio to each.
 - **Decoder settings.** Capcoder runs multimon-ng with mmng-ui's POCSAG arguments, minus `-u`:
   `-a POCSAG512 -a POCSAG1200 -a POCSAG2400 -f alpha -t raw -q --timestamp -p -C US -`
   - **`-f alpha` (force text decoding) is needed for the iStation.** POCSAG can encode a message body as numeric digits (4 bits each) or as 7-bit ASCII text, and the function bits conventionally say which (0 = numeric, 3 = alpha). The HMEW protocol document only describes what the PC sends; it doesn't say how the transmitter encodes pages on air, and you can't choose it. On 2026-10-10 a page to pager 1 (capcode 870008) arrived with `Function: 0`, which by convention means numeric, yet decoded cleanly as the text `5551212` under `-f alpha`. The unit therefore sent the body as text despite the numeric function bits. In `standard` mode multimon-ng trusts the function bits and would very likely garble such pages. If a page for your capcode ever shows up garbled, the unit may have sent real numeric encoding; try `--decode-mode auto` then.
@@ -259,7 +259,7 @@ http://127.0.0.1:8073/?keys=func,right&step=0    # global menu, all keys at once
 msedge --headless=new --window-size=1000,560 --screenshot=shot.png "http://127.0.0.1:8073/?step=0&keys=read,read"
 ```
 
-**End to end:** run Capcoder with SDR++ sending audio, then page the test capcode with `hmew`. Check that the status line shows `receiving` and that the decode appears in the log.
+**End to end:** run Capcoder with `rtl_fm` sending audio, then page the test capcode with `hmew`. Check that the status line shows `receiving` and that the decode appears in the log.
 
 ## Open questions
 

@@ -60,7 +60,7 @@ class MessageTests(unittest.TestCase):
 class FakeTransmitter:
     """Answers send_page.php like the iStation and records each request."""
 
-    def __init__(self, reply="!sc1"):
+    def __init__(self, reply="!sc1", status=200):
         self.requests = []
         outer = self
 
@@ -68,7 +68,7 @@ class FakeTransmitter:
             def do_GET(self):
                 outer.requests.append(self.path)
                 body = reply.encode()
-                self.send_response(200)
+                self.send_response(status)
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
@@ -165,6 +165,35 @@ class CommandLineTests(unittest.TestCase):
         code, _, err = self.run_cli("-n", "-p", "1", "5551212")
         self.assertEqual(code, 2)
         self.assertIn("-h/--host", err)
+
+    def test_http_error_status_is_not_called_unreachable(self):
+        self.tx.close()
+        self.tx = FakeTransmitter(reply="Not Found", status=404)
+        code, _, err = self.run_cli("-n", "-p", "1", "-h", self.tx.host, "1")
+        self.assertEqual(code, 1)
+        self.assertIn("HTTP 404", err)
+        self.assertNotIn("cannot reach", err)
+
+    def test_unreachable(self):
+        port = self.tx.host.rsplit(":", 1)[1]
+        self.tx.close()   # nothing listens there now
+        self.tx = FakeTransmitter()
+        code, _, err = self.run_cli("-n", "-p", "1", "-h", f"127.0.0.1:{port}", "1")
+        self.assertEqual(code, 1)
+        self.assertIn("cannot reach", err)
+
+    def test_verbose_shows_request_and_reply(self):
+        code, out, err = self.run_cli("-v", "-n", "-p", "3", "-h", self.tx.host, "555-1212")
+        self.assertEqual(code, 0)
+        self.assertIn("from -h/--host", err)
+        self.assertIn("GET http://127.0.0.1", err)
+        self.assertIn("send_page.php?pager=3&type=1&msg=555-1212", err)
+        self.assertIn("reply '!sc1' (HTTP 200)", err)
+        self.assertIn("!sc1", out)   # result line stays on stdout
+
+    def test_quiet_without_verbose(self):
+        code, _, err = self.run_cli("-n", "-p", "3", "-h", self.tx.host, "555-1212")
+        self.assertEqual((code, err), (0, ""))
 
     def test_transmitter_rejection_is_reported(self):
         self.tx.close()

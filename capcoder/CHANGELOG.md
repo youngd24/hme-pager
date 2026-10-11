@@ -17,7 +17,7 @@
 
 This is the first release, under the old name **vpager**; names and paths below are as they were then. On 2026-10-10 it received a real over-the-air page from the iStation (pager 1, capcode 870008, `5551212`) and displayed it.
 
-- Listens for raw UDP audio on port 8888 (the SDR++ network sink) and decodes it with multimon-ng. The pipeline is adapted from mmng-ui.
+- Listens for raw UDP audio on port 8888 (e.g. `rtl_fm` piped into netcat) and decodes it with multimon-ng. The pipeline is adapted from mmng-ui.
 - Answers to one capcode, set with `--capcode`, with `--base`/`--pager`, or from the pager's menu. Every other decode is logged and ignored. An identical page within 10 s is dropped as a duplicate.
 - The Motorola Advisor-style face runs in the browser:
   - a 4×20 dot-matrix LCD

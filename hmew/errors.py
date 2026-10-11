@@ -13,6 +13,22 @@ class TransmitterUnreachable(PagerError):
     """Timeout, connection refused, or other network-level failure."""
 
 
+class TransmitterHTTPError(PagerError):
+    """The transmitter answered, but with an HTTP error status (e.g. 404, 500).
+
+    Distinct from TransmitterUnreachable: the network path works, the unit
+    (or something at that address) refused or failed the request.
+    """
+
+    def __init__(self, status: int, reason: str, url: str, body: str = ""):
+        detail = f": {body.strip()[:200]!r}" if body.strip() else ""
+        super().__init__(f"transmitter answered HTTP {status} {reason}{detail}")
+        self.status = status
+        self.reason = reason
+        self.url = url
+        self.body = body
+
+
 class UnexpectedReply(PagerError):
     """Reply did not match the documented ``!s<code><n>`` format."""
 
