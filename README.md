@@ -25,6 +25,7 @@ Other models or firmware versions may behave differently, particularly in their 
 |---|---|
 | [`hmew/`](hmew/) | Library that sends pages through the iStation, either over the network (its HTTP interface, `send_page.php`) or over an RS-232 serial cable (the Scope protocol). It checks pager numbers, capcodes and message text before sending, and turns the transmitter's replies into results or clear errors. |
 | [`pager.py`](pager.py) | Command line for sending a page, built on `hmew`. |
+| [`config.example`](config.example) | Example defaults for `pager.py`; copy to `~/.hme-pager/config`. |
 | [`capcoder/`](capcoder/) | **Mockorola Capcoder**: a virtual Motorola Advisor-style pager that answers to one capcode. See its [README](capcoder/README.md). |
 | [`tests/`](tests/) | Unit tests for both sides. |
 | [`refdocs/`](refdocs/) | Reference documents: the HMEW Integration Protocol and the Motorola Advisor user manual. |
@@ -34,24 +35,61 @@ Other models or firmware versions may behave differently, particularly in their 
 
 ## Sending pages: `pager.py`
 
-Over the network (HTTP) or a serial cable (RS-232):
+Pages go over the network (the transmitter's HTTP interface) or a serial cable (RS-232). With the defaults set in a config file, a page needs only who to page and the message:
 
 ```
-python pager.py -n -p 3 -h 192.168.1.100 555-1212
+python pager.py -p 1 Test page
+```
+
+Options override the config for one page, or replace it entirely:
+
+```
+python pager.py -n -p 1 5551212                         # numeric this time
+python pager.py -m network -p 3 Barcode error aisle 3   # network this time, using the configured host
 python pager.py -a -p 3 -h 192.168.1.100 Barcode error aisle 3
 python pager.py -n -p 1 --base 087 -s /dev/ttyS0 5551212
 python pager.py -a -c 0870008 -s /dev/ttyS0 Test page
 ```
 
+### Configuration file
+
+Defaults live in `~/.hme-pager/config`; copy [`config.example`](config.example) there to start. Every setting is optional, and options on the command line always win.
+
+```ini
+[pager]
+mode = serial              # network or serial
+host = 192.168.1.100       # for network: host or host:port (port 80 if not given)
+serial_port = /dev/ttyS0   # for serial
+base = 087                 # base ID, so serial can page by pager number
+type = alpha               # alpha or numeric, when neither -a nor -n is given
+verbose = false            # true or false
 ```
-usage: pager.py (-a | -n) (-p N | -c CAPCODE) (-h HOST[:PORT] | -s DEVICE) [--base NNN] [-v] message ...
+
+| Setting | Overridden by |
+|---|---|
+| `mode` | `-m network\|serial`, or `-h`/`-s`, which also give the address |
+| `host` | `-h HOST[:PORT]` |
+| `serial_port` | `-s DEVICE` |
+| `base` | `--base NNN` |
+| `type` | `-a` / `-n` |
+| `verbose` | `-v` turns it on, `-q` turns it off |
+
+- **Other locations:** `--config FILE` reads a different file. This is useful for a service account, such as FreePBX's `asterisk` user, whose home folder is elsewhere.
+- **No file:** if `~/.hme-pager/config` doesn't exist, there are no defaults, and everything comes from the command line as before.
+- **Errors:** a misspelled setting, an unknown section or a bad value stops with an error naming the file and setting, before anything is sent.
+- **No environment variables:** pager.py no longer reads `HMEWHOST`, `HMEWSERIAL` or `HMEWBASE`.
+
+### Options
+
+```
+usage: pager.py [-a | -n] (-p N | -c CAPCODE) [-m MODE | -h HOST[:PORT] | -s DEVICE] [--base NNN] [-v | -q] [--config FILE] message ...
 
 Send a numeric or alphanumeric page through the HME/JTECH iStation, over the network (HTTP) or a serial cable (RS-232).
 
 positional arguments:
   message               the message to send
 
-what to send:
+what to send (default: type in the config):
   -a, --alpha           send an alphanumeric (text) page
   -n, --numeric         send a numeric page (digits, space, - [ ] U; max 20)
 
@@ -59,21 +97,25 @@ who to page:
   -p, --pager N         pager number, 1-999
   -c, --capcode CAPCODE
                         full 7-digit capcode, e.g. 0870008 (serial only)
-  --base NNN            base ID (000-209), needed with -p over serial (default: $HMEWBASE)
+  --base NNN            base ID (000-209), needed with -p over serial (default: base in the config)
 
-how to send:
+how to send (default: mode in the config):
+  -m, --mode {network,serial}
+                        network or serial, using the config's host or serial_port
   -h, --host HOST[:PORT]
-                        send over HTTP to this transmitter (default: $HMEWHOST; port 80)
-  -s, --serial DEVICE   send over this serial port, e.g. /dev/ttyS0 (default: $HMEWSERIAL)
+                        send over the network to this transmitter (port 80 unless given)
+  -s, --serial DEVICE   send over this serial port, e.g. /dev/ttyS0
 
 other:
   -v, --verbose         show what is sent and what the transmitter replies (on stderr)
+  -q, --quiet           not verbose, even if the config says verbose = true
+  --config FILE         read defaults from FILE instead of ~/.hme-pager/config
   --help                show this help and exit
 
-HTTP sends by pager number and the transmitter adds its base ID. Serial sends by full capcode: give -c, or -p with the base ID (--base or
-HMEWBASE). Environment defaults: HMEWHOST, HMEWSERIAL, HMEWBASE; if both HMEWHOST and HMEWSERIAL are set, choose with -h or -s. The
-message is everything that isn't an option; several words are joined with single spaces (quote it to keep extra spaces). If the message
-starts with '-', put '--' before it.
+Defaults come from ~/.hme-pager/config ([pager] section: mode, host, serial_port, base, type, verbose); options override them. HTTP sends
+by pager number and the transmitter adds its base ID. Serial sends by full capcode: give -c, or -p with the base ID. The message is
+everything that isn't an option; several words are joined with single spaces (quote it to keep extra spaces). If the message starts with
+'-', put '--' before it.
 ```
 
 The message is checked before anything is sent. A numeric page may contain only digits, space, `-`, `[`, `]` and `U` (up to 20 characters). An alpha page may contain only printable ASCII (up to 128 characters) on either connection. Exit status is 0 on success, 2 for a usage or message error, and 1 if the transmitter rejects the page, gives no reply, answers with an HTTP error, or can't be reached.
@@ -83,7 +125,7 @@ The message is checked before anything is sent. A numeric page may contain only 
 Capcode = 3-digit base ID followed by pager × 8 as 4 digits. For example, base 087 and pager 3 give capcode 0870024.
 
 - **HTTP** takes a pager number (1-999), and the transmitter adds its own base ID. HTTP can't address a capcode directly.
-- **Serial** takes the full capcode. Give it with `-c`, or give `-p` plus the base ID (`--base` or `HMEWBASE`) and pager.py works out the capcode.
+- **Serial** takes the full capcode. Give it with `-c`, or give `-p` plus the base ID (`base` in the config, or `--base`) and pager.py works out the capcode.
 
 ### Serial details
 
@@ -98,25 +140,34 @@ Capcode = 3-digit base ID followed by pager × 8 as 4 digits. For example, base 
 
 ### Verbose output
 
-`-v` shows where the transmitter setting came from, exactly what is sent, and the reply with its timing. Over HTTP:
+`-v` (or `verbose = true` in the config) shows which config file was read, where each setting came from, exactly what is sent, and the reply with its timing. Over serial, with everything from the config:
 
 ```
-pager: HTTP transmitter 192.168.1.100 port 80 (from -h/--host)
+$ python pager.py -v -p 1 Test page
+pager: config /home/youngd/.hme-pager/config: mode=serial, serial_port=/dev/ttyS0, base=087, type=alpha, host=192.168.1.100
+pager: type alpha (from config)
+pager: mode serial (from config)
+pager: serial port /dev/ttyS0 (from config)
+pager: base ID 087 (from config)
+hmew: alpha page to capcode(s) 0870008 via serial /dev/ttyS0: 'Test page' (beep 1)
+hmew: opened /dev/ttyS0 at 9600 baud, 8N1, no flow control
+hmew: write b'AF0870008ATest page\r'
+hmew: reply b'OK\r\n' in 34 ms
+sent alpha page to pager 1 (capcode 0870008) via serial /dev/ttyS0: 'Test page' (transmitter replied OK)
+```
+
+Over the network, overriding the config's mode and type:
+
+```
+$ python pager.py -v -n -m network -p 3 555-1212
+pager: config /home/youngd/.hme-pager/config: mode=serial, serial_port=/dev/ttyS0, base=087, type=alpha, host=192.168.1.100
+pager: type numeric (from -a/-n)
+pager: mode network (from -m/--mode)
+pager: transmitter 192.168.1.100 port 80 (from config)
 hmew: numeric page to pager(s) 3 via 192.168.1.100:80: '555-1212' (beep 1, 1200 baud)
 hmew: GET http://192.168.1.100/send_page.php?pager=3&type=1&msg=555-1212&baud=1&beep=1
-hmew: reply '!sc1' (HTTP 200) in 42 ms
-sent numeric page to pager 3 via HTTP 192.168.1.100: '555-1212' (transmitter replied !sc1)
-```
-
-Over serial:
-
-```
-pager: serial transmitter /dev/ttyS0 (from -s/--serial), base ID 087
-hmew: numeric page to capcode(s) 0870008 via serial /dev/ttyS0: '5551212' (beep 1)
-hmew: opened /dev/ttyS0 at 9600 baud, 8N1, no flow control
-hmew: write b'NF0870008A5551212\r'
-hmew: reply b'OK\r\n' in 12 ms
-sent numeric page to pager 1 (capcode 0870008) via serial /dev/ttyS0: '5551212' (transmitter replied OK)
+hmew: reply '!sc1' (HTTP 200) in 50 ms
+sent numeric page to pager 3 via network 192.168.1.100: '555-1212' (transmitter replied !sc1)
 ```
 
 ### From Python
@@ -131,7 +182,7 @@ SerialTransmitter("/dev/ttyS0", base=87).send(page)
 SerialTransmitter("/dev/ttyS0").send(Page(PageType.ALPHA, "Test page", capcodes=(870008,)))
 ```
 
-Both have the same `send(page)` method, so code can take either one. The older `PagerClient("192.168.1.100").send_numeric(pager=3, msg="555-1212")` still works; `PagerClient` is another name for `HttpTransmitter`.
+Both have the same `send(page)` method, so code can take either one. Scripts can read the same defaults as pager.py with `hmew.config.load()` (or `load("/path/to/config")`), which returns the settings or raises `ConfigError`. The older `PagerClient("192.168.1.100").send_numeric(pager=3, msg="555-1212")` still works; `PagerClient` is another name for `HttpTransmitter`.
 
 ## Receiving pages: Mockorola Capcoder
 
@@ -149,8 +200,10 @@ See the [Capcoder README](capcoder/README.md) for setup, options, behavior and t
 ## Tests
 
 ```
-python -m unittest tests.test_hmew tests.test_hmew_serial tests.test_capcoder
+python -m unittest tests.test_hmew tests.test_hmew_serial tests.test_hmew_config tests.test_capcoder
 ```
+
+The tests never read your real `~/.hme-pager/config`.
 
 The sender's tests never send a real page. HTTP tests use a fake transmitter on 127.0.0.1. Serial tests use a fake port, plus, on Linux and macOS, a pseudo-terminal pair that plays the transmitter (those 4 tests are skipped on Windows).
 

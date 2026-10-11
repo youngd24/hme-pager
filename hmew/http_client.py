@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import threading
 import time
@@ -60,15 +59,14 @@ class HttpTransmitter:
 
     def __init__(
         self,
-        host: Optional[str] = None,
+        host: str,
         port: int = 80,
         timeout: float = 3.0,
         retries: int = 3,
         backoff: float = 0.5,
     ):
-        host = host or os.environ.get("HMEWHOST")
         if not host:
-            raise ValidationError("no host given (set HMEWHOST or pass host=)")
+            raise ValidationError("no transmitter host given")
         self.host = host
         self.port = port
         self.timeout = timeout

@@ -6,9 +6,11 @@ The command-line tests send to a fake transmitter on 127.0.0.1, never the real u
 import contextlib
 import io
 import os
+import tempfile
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from unittest import mock
 from urllib.parse import parse_qs, urlsplit
 
@@ -92,12 +94,14 @@ class FakeTransmitter:
 class CommandLineTests(unittest.TestCase):
     def setUp(self):
         self.tx = FakeTransmitter()
-        env = {k: v for k, v in os.environ.items() if k not in ("HMEWHOST", "HMEWSERIAL", "HMEWBASE")}
-        self.env = mock.patch.dict(os.environ, env, clear=True)
-        self.env.start()
+        # Never read the real ~/.hme-pager/config: point the default at an empty temp dir.
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = mock.patch("hmew.config.DEFAULT_PATH", Path(self.tmp.name) / "config")
+        self.cfg.start()
 
     def tearDown(self):
-        self.env.stop()
+        self.cfg.stop()
+        self.tmp.cleanup()
         self.tx.close()
 
     def run_cli(self, *argv):
@@ -142,10 +146,12 @@ class CommandLineTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(self.tx.last_query()["msg"], "hello")
 
-    def test_host_from_environment(self):
-        os.environ["HMEWHOST"] = self.tx.host
-        code, _, _ = self.run_cli("-n", "-p", "1", "5551212")
-        self.assertEqual(code, 0)
+    def test_environment_variables_are_ignored(self):
+        with mock.patch.dict(os.environ, {"HMEWHOST": self.tx.host, "HMEWSERIAL": "/dev/x", "HMEWBASE": "087"}):
+            code, _, err = self.run_cli("-n", "-p", "1", "5551212")
+        self.assertEqual(code, 2)
+        self.assertIn("say how to send", err)
+        self.assertEqual(self.tx.requests, [])
 
     def test_alpha_and_numeric_are_mutually_exclusive(self):
         code, _, err = self.run_cli("-a", "-n", "-p", "1", "-h", self.tx.host, "x")

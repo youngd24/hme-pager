@@ -66,6 +66,7 @@ hmew/
   scope.py          Scope command bytes + ACK check; no I/O
   serialport.py     open_port(): PosixPort (termios, flock exclusive lock, 10 s wait) or PySerialPort
   serial_client.py  SerialTransmitter: capcodes (or pagers + base), one command per capcode, wait for OK
+  config.py         load() ~/.hme-pager/config (INI, [pager] section) -> Settings; ConfigError
 ```
 
 Public API (package renamed from `hmew_pager` to `hmew`). Both transmitters have `send(page) -> SendResult`:
@@ -79,7 +80,7 @@ SerialTransmitter("/dev/ttyS0").send(Page(PageType.ALPHA, "hi", capcodes=(870008
 # Older calls still work: PagerClient("...").send_numeric(pager=3, msg="555-1212")
 ```
 
-`HttpTransmitter` with `capcodes` raises `ValidationError` (HTTP can't address a capcode). `SerialTransmitter` with `pagers` needs `base`. `HttpTransmitter(host=None)` reads `HMEWHOST`.
+`HttpTransmitter` with `capcodes` raises `ValidationError` (HTTP can't address a capcode). `SerialTransmitter` with `pagers` needs `base`. `HttpTransmitter(host)` requires the host; no environment variables are read anywhere (removed for 0.3, by the user's request).
 
 Decisions:
 - **Validate before sending.** Bad input raises `ValidationError` locally so a typo in the IVR can't become a stray page.
@@ -93,9 +94,10 @@ Decisions:
 ## Status
 
 - HTTP sending works against the real iStation (pages received on Capcoder). Serial: `pager.py -s /dev/ttyS0` works against the real unit (2026-10-11, netsrv26: `AF0870008ASerial test\r` -> `OK` in 34 ms), on top of tests with fake ports and a Linux pty.
-- Command line: `pager.py` at the repo root. `python pager.py (-a | -n) (-p N | -c CAPCODE) (-h HOST[:PORT] | -s DEVICE) [--base NNN] [-v] message...`. Pairs `-a`/`-n`, `-p`/`-c`, `-h`/`-s` are each mutually exclusive with one required (`-h`/`-s` may come from `HMEWHOST`/`HMEWSERIAL`; both env vars set without a flag is an error). `-c` is serial only; `-p` over serial needs `--base`/`HMEWBASE`. `-h` is host, so help is `--help` only. The message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors (including serial `NoReply`).
+- Command line: `pager.py` at the repo root. `python pager.py [-a | -n] (-p N | -c CAPCODE) [-m MODE | -h HOST[:PORT] | -s DEVICE] [--base NNN] [-v | -q] [--config FILE] message...`. With a config, `pager.py -p 1 Test page` is enough. Precedence: command line > config file > nothing. `-a`/`-n` override `type`; `-h`/`-s` give the address and imply the mode; `-m network|serial` switches mode using the config's `host`/`serial_port` (at most one of `-m`/`-h`/`-s`); `--base` overrides `base`; `-v`/`-q` override `verbose`. `-p`/`-c` exactly one. `-c` is serial only; `-p` over serial needs a base ID. `-h` is host, so help is `--help` only. The message is the only positional (words joined with single spaces). Config errors and the message are checked before anything is sent; exit 2 for usage/config/validation errors, 1 for transmitter/network errors (including serial `NoReply`). Missing settings give errors naming the config path to set them in.
+- Config file (0.3): `~/.hme-pager/config`, INI, `[pager]` section, keys `mode` (network|serial), `host` (host[:port]), `serial_port`, `base` (digits, 000-209), `type` (alpha|numeric), `verbose` (true|false, default false). `base` wasn't in the user's list but replaces `HMEWBASE` so serial `-p` doesn't need `--base` every time. Unknown keys/sections and bad values are errors (catch typos). Missing default file = no defaults; missing `--config FILE` = error. Template: `config.example` at the repo root. For FreePBX, the asterisk user's home differs, so use `--config` or put the file in that user's `~/.hme-pager/`. Tests patch `hmew.config.DEFAULT_PATH` so they never read the real file.
 - Message checks (`models.validate_message`): numeric = only digits, space, `-`, `[`, `]`, `U`, max 20 (empty allowed: type 1 is also "vibe only"); alpha = printable ASCII only (no control chars), not empty/all spaces, max 128 bytes. Errors name the offending characters.
-- Tests: `tests/test_hmew.py` (message checks + HTTP CLI against a fake transmitter on 127.0.0.1); `tests/test_hmew_serial.py` (Scope bytes, capcode rules, SerialTransmitter and serial CLI with a fake port; `PosixPortTests` use a pty and are skipped on Windows; run them in WSL: `wsl -d Ubuntu --cd /mnt/c/Users/youngd/src/hme-pager -- python3 -m unittest tests.test_hmew_serial`).
+- Tests: `tests/test_hmew.py` (message checks + HTTP CLI against a fake transmitter on 127.0.0.1); `tests/test_hmew_serial.py` (Scope bytes, capcode rules, SerialTransmitter and serial CLI with a fake port; `PosixPortTests` use a pty and are skipped on Windows; run them in WSL: `wsl -d Ubuntu --cd /mnt/c/Users/youngd/src/hme-pager -- python3 -m unittest tests.test_hmew_serial`); `tests/test_hmew_config.py` (loader, precedence, `--config`, `-q`).
 - Not written yet: the FreePBX AGI wrapper (set aside for later), packaging.
 
 ## Open questions (test on the real unit)

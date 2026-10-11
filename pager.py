@@ -1,8 +1,14 @@
-"""Send a page through the HME/JTECH iStation, over HTTP or serial (RS-232).
+"""Send a page through the HME/JTECH iStation, over the network (HTTP) or serial (RS-232).
 
-    python pager.py -n -p 3 -h 192.168.1.100 555-1212
-    python pager.py -a -p 3 -h 192.168.1.100:8080 Barcode error aisle 3
-    python pager.py -n -p 1 -s /dev/ttyS0 --base 087 5551212
+Defaults come from ~/.hme-pager/config; options override them. With a config
+that sets mode, host or serial_port, base and type, a page is just:
+
+    python pager.py -p 1 Test page
+
+Without a config, or to override it:
+
+    python pager.py -a -p 3 -h 192.168.1.100 Barcode error aisle 3
+    python pager.py -n -p 1 --base 087 -s /dev/ttyS0 5551212
     python pager.py -a -c 0870008 -s /dev/ttyS0 Test page
 """
 
@@ -10,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from typing import Optional
 
@@ -22,6 +27,7 @@ from hmew import (
     SerialTransmitter,
     ValidationError,
 )
+from hmew import config as hconfig
 from hmew.models import (
     BASE_MAX,
     BASE_MIN,
@@ -85,21 +91,21 @@ class Parser(argparse.ArgumentParser):
 def build_parser() -> argparse.ArgumentParser:
     p = Parser(
         prog="pager.py",
-        usage=("%(prog)s (-a | -n) (-p N | -c CAPCODE) (-h HOST[:PORT] | -s DEVICE) "
-               "[--base NNN] [-v] message ..."),
+        usage=("%(prog)s [-a | -n] (-p N | -c CAPCODE) [-m MODE | -h HOST[:PORT] | -s DEVICE] "
+               "[--base NNN] [-v | -q] [--config FILE] message ..."),
         description=("Send a numeric or alphanumeric page through the HME/JTECH iStation, "
                      "over the network (HTTP) or a serial cable (RS-232)."),
         add_help=False,   # -h is --host here; help is --help only
         epilog=(
-            "HTTP sends by pager number and the transmitter adds its base ID. Serial sends "
-            "by full capcode: give -c, or -p with the base ID (--base or HMEWBASE). "
-            "Environment defaults: HMEWHOST, HMEWSERIAL, HMEWBASE; if both HMEWHOST and "
-            "HMEWSERIAL are set, choose with -h or -s. The message is everything that isn't "
-            "an option; several words are joined with single spaces (quote it to keep extra "
-            "spaces). If the message starts with '-', put '--' before it."
+            "Defaults come from ~/.hme-pager/config ([pager] section: mode, host, serial_port, "
+            "base, type, verbose); options override them. HTTP sends by pager number and the "
+            "transmitter adds its base ID. Serial sends by full capcode: give -c, or -p with "
+            "the base ID. The message is everything that isn't an option; several words are "
+            "joined with single spaces (quote it to keep extra spaces). If the message starts "
+            "with '-', put '--' before it."
         ),
     )
-    what = p.add_argument_group("what to send")
+    what = p.add_argument_group("what to send (default: type in the config)")
     what.add_argument("-a", "--alpha", action="store_true", help="send an alphanumeric (text) page")
     what.add_argument("-n", "--numeric", action="store_true",
                       help="send a numeric page (digits, space, - [ ] U; max 20)")
@@ -110,15 +116,21 @@ def build_parser() -> argparse.ArgumentParser:
                      help="full 7-digit capcode, e.g. 0870008 (serial only)")
     who.add_argument("--base", type=base_number, metavar="NNN",
                      help=f"base ID ({BASE_MIN:03d}-{BASE_MAX:03d}), needed with -p over serial "
-                          "(default: $HMEWBASE)")
-    how = p.add_argument_group("how to send")
+                          "(default: base in the config)")
+    how = p.add_argument_group("how to send (default: mode in the config)")
+    how.add_argument("-m", "--mode", choices=hconfig.MODES,
+                     help="network or serial, using the config's host or serial_port")
     how.add_argument("-h", "--host", metavar="HOST[:PORT]",
-                     help="send over HTTP to this transmitter (default: $HMEWHOST; port 80)")
+                     help="send over the network to this transmitter (port 80 unless given)")
     how.add_argument("-s", "--serial", metavar="DEVICE",
-                     help="send over this serial port, e.g. /dev/ttyS0 (default: $HMEWSERIAL)")
+                     help="send over this serial port, e.g. /dev/ttyS0")
     other = p.add_argument_group("other")
     other.add_argument("-v", "--verbose", action="store_true",
                        help="show what is sent and what the transmitter replies (on stderr)")
+    other.add_argument("-q", "--quiet", action="store_true",
+                       help="not verbose, even if the config says verbose = true")
+    other.add_argument("--config", metavar="FILE",
+                       help="read defaults from FILE instead of ~/.hme-pager/config")
     other.add_argument("--help", action="help", help="show this help and exit")
     p.add_argument("message", nargs="+", help="the message to send")
     return p
@@ -127,8 +139,17 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[list] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if not args.verbose:
-        return _run(parser, args)
+    if args.verbose and args.quiet:
+        parser.error("-v/--verbose and -q/--quiet are mutually exclusive; use one")
+    try:
+        settings = hconfig.load(args.config)
+    except hconfig.ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    verbose = args.verbose or (settings.verbose and not args.quiet)
+    if not verbose:
+        return _run(parser, args, settings)
     # Verbose: debug messages from this script and the hmew library go to stderr.
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
@@ -137,7 +158,7 @@ def main(argv: Optional[list] = None) -> int:
         lg.setLevel(logging.DEBUG)
         lg.addHandler(handler)
     try:
-        return _run(parser, args)
+        return _run(parser, args, settings)
     finally:
         for lg in loggers:
             lg.removeHandler(handler)
@@ -149,21 +170,53 @@ def _usage_error(message: str) -> int:
     return 2
 
 
-def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
+def _run(parser: argparse.ArgumentParser, args: argparse.Namespace,
+         settings: hconfig.Settings) -> int:
+    cfg_name = str(settings.path) if settings.path else "~/.hme-pager/config"
+    if settings.path:
+        log.debug("config %s: %s", settings.path,
+                  ", ".join(f"{k}={v}" for k, v in settings.set_in_file.items()) or "no settings")
+    else:
+        log.debug("config: none (%s not found)", hconfig.DEFAULT_PATH)
+
+    def source(flag_given: bool, flag: str) -> str:
+        return flag if flag_given else "config"
+
+    # What to send: -a/-n, else the config's type.
     if args.alpha and args.numeric:
         parser.error("-a/--alpha and -n/--numeric are mutually exclusive; use one")
-    if not (args.alpha or args.numeric):
-        parser.error("say what kind of page: -a/--alpha or -n/--numeric")
+    if args.alpha or args.numeric:
+        kind = "alpha" if args.alpha else "numeric"
+    elif settings.type:
+        kind = settings.type
+    else:
+        parser.error(f"say what kind of page: -a/--alpha or -n/--numeric (or set type in {cfg_name})")
+    log.debug("type %s (from %s)", kind, source(args.alpha or args.numeric, "-a/-n"))
+
+    # Who to page.
     if args.pager is not None and args.capcode is not None:
         parser.error("-p/--pager and -c/--capcode are mutually exclusive; use one")
     if args.pager is None and args.capcode is None:
         parser.error("say who to page: -p/--pager N or -c/--capcode NNNNNNN")
-    if args.host and args.serial:
-        parser.error("-h/--host and -s/--serial are mutually exclusive; use one")
+
+    # How to send: -h or -s (address given), else -m, else the config's mode.
+    given = [flag for flag, val in (("-m/--mode", args.mode), ("-h/--host", args.host),
+                                    ("-s/--serial", args.serial)) if val]
+    if len(given) > 1:
+        parser.error(f"{' and '.join(given)} are mutually exclusive; use one")
+    if args.host:
+        mode = "network"
+    elif args.serial:
+        mode = "serial"
+    else:
+        mode = args.mode or settings.mode
+    if not mode:
+        return _usage_error(f"say how to send: -h/--host, -s/--serial or -m/--mode "
+                            f"(or set mode in {cfg_name})")
+    log.debug("mode %s (from %s)", mode, given[0] if given else "config")
 
     msg = " ".join(args.message)
-    page_type = PageType.ALPHA if args.alpha else PageType.VIBE_NUMERIC
-    kind = "alpha" if args.alpha else "numeric"
+    page_type = PageType.ALPHA if kind == "alpha" else PageType.VIBE_NUMERIC
 
     # Check the message before anything about the transmitter, so a bad message is reported first.
     try:
@@ -172,45 +225,35 @@ def _run(parser: argparse.ArgumentParser, args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    # Which transmitter: a flag wins; otherwise the environment, which must not be ambiguous.
-    env_host, env_serial = os.environ.get("HMEWHOST"), os.environ.get("HMEWSERIAL")
-    if args.host or args.serial:
-        host_text, device = args.host, args.serial
-        source = "-h/--host" if args.host else "-s/--serial"
-    elif env_host and env_serial:
-        return _usage_error("both HMEWHOST and HMEWSERIAL are set; choose with -h/--host or -s/--serial")
-    elif env_host or env_serial:
-        host_text, device = env_host, env_serial
-        source = "HMEWHOST" if env_host else "HMEWSERIAL"
-    else:
-        return _usage_error("no transmitter: use -h/--host or -s/--serial "
-                            "(or set HMEWHOST or HMEWSERIAL)")
-
     page_kwargs = {"pagers": (args.pager,)} if args.pager is not None else {"capcodes": (args.capcode,)}
     page = Page(kind=page_type, msg=msg, **page_kwargs)
 
     try:
-        if host_text:
+        if mode == "network":
             if args.capcode is not None:
-                return _usage_error("HTTP sends by pager number and the transmitter adds its base ID; "
-                                    "use -p/--pager, or -s/--serial to send by capcode")
+                return _usage_error("the network interface sends by pager number and the transmitter "
+                                    "adds its base ID; use -p/--pager, or serial to send by capcode")
+            host_text = args.host or settings.host
+            if not host_text:
+                return _usage_error(f"network mode needs a transmitter: -h/--host HOST "
+                                    f"(or set host in {cfg_name})")
             host, port = split_host(host_text)
-            log.debug("HTTP transmitter %s port %d (from %s)", host, port, source)
+            log.debug("transmitter %s port %d (from %s)", host, port, source(bool(args.host), "-h/--host"))
             transmitter = HttpTransmitter(host, port=port)
-            via = f"HTTP {host_text}"
+            via = f"network {host_text}"
             target = f"pager {args.pager}"
         else:
-            base = args.base
-            if base is None and os.environ.get("HMEWBASE"):
-                try:
-                    base = base_number(os.environ["HMEWBASE"])
-                except argparse.ArgumentTypeError as exc:
-                    return _usage_error(f"HMEWBASE: {exc}")
-            if args.pager is not None and base is None:
-                return _usage_error("serial sends by capcode: add --base NNN (or set HMEWBASE) "
-                                    "to page by pager number, or use -c/--capcode")
-            log.debug("serial transmitter %s (from %s)%s", device, source,
-                      f", base ID {base:03d}" if base is not None else "")
+            device = args.serial or settings.serial_port
+            if not device:
+                return _usage_error(f"serial mode needs a port: -s/--serial DEVICE "
+                                    f"(or set serial_port in {cfg_name})")
+            log.debug("serial port %s (from %s)", device, source(bool(args.serial), "-s/--serial"))
+            base = args.base if args.base is not None else settings.base
+            if args.pager is not None:
+                if base is None:
+                    return _usage_error(f"serial sends by capcode: add --base NNN (or set base in "
+                                        f"{cfg_name}) to page by pager number, or use -c/--capcode")
+                log.debug("base ID %03d (from %s)", base, source(args.base is not None, "--base"))
             transmitter = SerialTransmitter(device, base=base)
             via = f"serial {device}"
             if args.pager is not None:

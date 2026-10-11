@@ -2,6 +2,20 @@
 
 Releases of the whole repo, tagged in git. Capcoder's own detailed changes are in [capcoder/CHANGELOG.md](capcoder/CHANGELOG.md).
 
+## Unreleased (planned 0.3)
+
+**Sending (`hmew` library and `pager.py`)**
+- **A config file for defaults:** `~/.hme-pager/config` (INI, `[pager]` section), with `mode` (network or serial), `host`, `serial_port`, `base`, `type` (alpha or numeric) and `verbose` (default false). A template is in `config.example`.
+- **Fewer options needed.** With the config set, `pager.py -p 1 Test page` is a complete command, and options override the config for one page.
+- **New options:**
+  - `-m/--mode network|serial` switches mode using the configured address.
+  - `-q/--quiet` turns verbose off.
+  - `--config FILE` reads a different file.
+- **No more environment variables.** `HMEWHOST`, `HMEWSERIAL` and `HMEWBASE` are no longer read, including by `HttpTransmitter`, which now requires a host.
+- **Config errors stop early.** A misspelled setting, an unknown section or a bad value is reported before anything is sent.
+- **`-v` shows where each setting came from** (the config file or an option).
+- Tests: `tests/test_hmew_config.py`.
+
 ## 0.2 (2026-10-11), git tag `v0.2`
 
 **Sending (`hmew` library and `pager.py`)**

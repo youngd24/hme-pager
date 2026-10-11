@@ -2,6 +2,7 @@
 
 import logging
 
+from .config import ConfigError
 from .errors import (
     NoReply,
     PageRejected,
@@ -37,6 +38,7 @@ __all__ = [
     "PageRejected",
     "QueueFull",
     "NoReply",
+    "ConfigError",
 ]
 
 # Library logging (logger "hmew") is silent unless the application configures it.

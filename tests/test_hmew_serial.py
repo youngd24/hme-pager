@@ -7,9 +7,11 @@ pseudo-terminal pair (Linux/macOS only; skipped on Windows).
 import contextlib
 import io
 import os
+import tempfile
 import threading
 import time
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import pager
@@ -125,16 +127,22 @@ class SerialTransmitterTests(unittest.TestCase):
 
 class SerialCommandLineTests(unittest.TestCase):
     def setUp(self):
-        env = {k: v for k, v in os.environ.items() if k not in ("HMEWHOST", "HMEWSERIAL", "HMEWBASE")}
-        self.env = mock.patch.dict(os.environ, env, clear=True)
-        self.env.start()
+        # Never read the real ~/.hme-pager/config: point the default at an empty temp dir.
+        self.tmp = tempfile.TemporaryDirectory()
+        self.config_path = Path(self.tmp.name) / "config"
+        self.cfg = mock.patch("hmew.config.DEFAULT_PATH", self.config_path)
+        self.cfg.start()
         self.port = FakePort()
         self.patch = mock.patch("hmew.serialport.open_port", self.port)
         self.patch.start()
 
     def tearDown(self):
         self.patch.stop()
-        self.env.stop()
+        self.cfg.stop()
+        self.tmp.cleanup()
+
+    def write_config(self, text):
+        self.config_path.write_text("[pager]\n" + text, encoding="utf-8")
 
     def run_cli(self, *argv):
         out, err = io.StringIO(), io.StringIO()
@@ -158,11 +166,13 @@ class SerialCommandLineTests(unittest.TestCase):
         self.assertEqual(self.port.written, [b"NF0870008A5551212\r"])
         self.assertIn("pager 1 (capcode 0870008)", out)
 
-    def test_serial_and_base_from_environment(self):
-        os.environ.update(HMEWSERIAL="/dev/ttyUSB0", HMEWBASE="087")
-        code, _, _ = self.run_cli("-n", "-p", "1", "5551212")
+    def test_everything_from_config(self):
+        self.write_config("mode = serial\nserial_port = /dev/ttyUSB0\nbase = 087\ntype = numeric\n")
+        code, out, _ = self.run_cli("-p", "1", "5551212")
         self.assertEqual(code, 0)
         self.assertEqual(self.port.device, "/dev/ttyUSB0")
+        self.assertEqual(self.port.written, [b"NF0870008A5551212\r"])
+        self.assertIn("numeric page to pager 1", out)
 
     def test_pager_over_serial_without_base(self):
         code, _, err = self.run_cli("-n", "-p", "1", "-s", "/dev/ttyS0", "5551212")
@@ -185,17 +195,34 @@ class SerialCommandLineTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("mutually exclusive", err)
 
-    def test_both_environment_targets_is_ambiguous(self):
-        os.environ.update(HMEWHOST="192.0.2.1", HMEWSERIAL="/dev/ttyS0")
-        code, _, err = self.run_cli("-n", "-p", "1", "1")
+    def test_mode_and_address_flags_mutually_exclusive(self):
+        code, _, err = self.run_cli("-n", "-p", "1", "-m", "serial", "-h", "192.0.2.1", "1")
         self.assertEqual(code, 2)
-        self.assertIn("choose with -h/--host or -s/--serial", err)
+        self.assertIn("-m/--mode and -h/--host are mutually exclusive", err)
 
-    def test_flag_beats_environment(self):
-        os.environ.update(HMEWHOST="192.0.2.1")
+    def test_serial_flag_beats_config_network_mode(self):
+        self.write_config("mode = network\nhost = 192.0.2.1\n")
         code, _, _ = self.run_cli("-a", "-c", "0870008", "-s", "/dev/ttyS1", "x")
         self.assertEqual(code, 0)
         self.assertEqual(self.port.device, "/dev/ttyS1")
+
+    def test_mode_flag_uses_configured_port(self):
+        self.write_config("mode = network\nhost = 192.0.2.1\nserial_port = /dev/ttyS3\n")
+        code, _, _ = self.run_cli("-a", "-c", "0870008", "-m", "serial", "x")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.port.device, "/dev/ttyS3")
+
+    def test_serial_mode_without_port(self):
+        self.write_config("mode = serial\n")
+        code, _, err = self.run_cli("-a", "-c", "0870008", "x")
+        self.assertEqual(code, 2)
+        self.assertIn("set serial_port in", err)
+
+    def test_base_flag_beats_config(self):
+        self.write_config("base = 017\n")
+        code, _, _ = self.run_cli("-n", "-p", "1", "--base", "087", "-s", "/dev/ttyS0", "1")
+        self.assertEqual(code, 0)
+        self.assertEqual(self.port.written, [b"NF0870008A1\r"])
 
     def test_bad_capcode_and_base(self):
         for argv in (("-c", "2097144"), ("-c", "12345678"), ("-c", "abc")):
@@ -223,7 +250,8 @@ class SerialCommandLineTests(unittest.TestCase):
     def test_verbose_shows_bytes(self):
         code, _, err = self.run_cli("-v", "-a", "-c", "0870008", "-s", "/dev/ttyS0", "Test")
         self.assertEqual(code, 0)
-        self.assertIn("serial transmitter /dev/ttyS0 (from -s/--serial)", err)
+        self.assertIn("serial port /dev/ttyS0 (from -s/--serial)", err)
+        self.assertIn("mode serial (from -s/--serial)", err)
         self.assertIn("write b'AF0870008ATest\\r'", err)
         self.assertIn("reply b'OK\\r\\n'", err)
 

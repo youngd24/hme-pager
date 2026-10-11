@@ -1,0 +1,22 @@
+# Defaults for pager.py. Copy to ~/.hme-pager/config and edit.
+# Every setting is optional; command-line options override them.
+
+[pager]
+# How to send: network (the transmitter's HTTP interface) or serial (RS-232).
+mode = serial
+
+# For network: the transmitter's address, host or host:port (port 80 if not given).
+host = 192.168.1.100
+
+# For serial: the port the transmitter's cable is on.
+serial_port = /dev/ttyS0
+
+# The transmitter's 3-digit base ID. Serial needs it to page by pager number
+# (capcode = base ID followed by pager x 8 as 4 digits; base 087, pager 1 -> 0870008).
+base = 087
+
+# What to send when neither -a nor -n is given: alpha or numeric.
+type = alpha
+
+# Show what is sent and the transmitter's reply on every page: true or false.
+verbose = false
