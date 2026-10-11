@@ -1030,7 +1030,7 @@
     $('#decode-line').textContent = d
       ? `last decode ${new Date(d.time).toLocaleTimeString()}: ${d.capcode} fn ${d.function} ${d.kind} "${d.text}" → ${d.verdict}`
       : 'no decodes yet';
-    $('#log-line').textContent = S.log_file ? `log: ${S.log_file}` : '';
+    $('#log-line').textContent = `vpager ${S.version || '?'}` + (S.log_file ? ` · log: ${S.log_file}` : '');
   }
 
   // ------------------------------------------------------------------ fit to window

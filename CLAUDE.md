@@ -93,14 +93,14 @@ Target approach: replace `CURL()` with a Python AGI script that imports this pac
 
 ## vpager (virtual pager, `vpager/`)
 
-Receive side: a Motorola Advisor-style pager in the browser that answers to one capcode. Stdlib only.
+Receive side: a Motorola Advisor-style pager in the browser that answers to one capcode. Stdlib only. Version 0.1 (tag `v0.1`, 2026-10-10): first real over-the-air page received and shown. Bump `vpager/__init__.py` `__version__` and add a `vpager/CHANGELOG.md` entry for each new tag.
 
-- Audio in: raw UDP on 8888 (same SDR++ network-sink stream mmng-ui takes), piped into multimon-ng. multimon-ng is found on PATH, then in `C:\rtl-sdr` on Windows (`receiver.EXTRA_DIRS`; v1.3.1 there works). Uses mmng-ui's multimon-ng flags minus `-u`, which caused problems for the user. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
+- Audio in: raw UDP on 8888 (same SDR++ network-sink stream mmng-ui takes), piped into multimon-ng. multimon-ng is found on PATH, then in `C:\rtl-sdr` on Windows (`receiver.EXTRA_DIRS`). Uses mmng-ui's multimon-ng flags (POCSAG only) minus `-u`. `C:\rtl-sdr` holds `multimon-ng.exe` (reports 1.3.0) and `multimon-ng_1.61.exe` (reports 1.6.0); the bare-name lookup finds only the former, so use `--mmng` for 1.6.0 unless it's renamed. `-u` was tried with both builds; the user found the output messier with it (stray address-only decodes for random capcodes), so it stays out. `receiver.py` is adapted from mmng-ui (GPL-3.0, attribution in the file header).
 - `decode.py` parses multimon-ng POCSAG lines; `core.py` does capcode filter + duplicate suppression and pushes server-sent events; `store.py` holds memory per the Advisor manual (`refdocs/advisor_inst.pdf`): 19 slots, 10 locked, Personal Message File of 10.
 - `web/` is the pager face (canvas 5x7 dot-matrix LCD, 4x20) and the button state machine.
 - Log: everything at DEBUG to `<data-dir>/vpager.log` (rotating), including every multimon-ng line, filter verdicts, UDP start/stop, and browser key presses/errors via `/api/log`. Data dir defaults to `%USERPROFILE%\.vpager` on Windows, deliberately not `%LOCALAPPDATA%`: the user's Python is the Microsoft Store build, which silently redirects AppData writes into its package sandbox (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.13_*\LocalCache\Local\...`).
 - Run: `python -m vpager --capcode 870024` (or `--base 87 --pager 3`). Test without radio: `python -m vpager inject "555-1212"`. Tests: `python -m unittest tests.test_vpager`.
-- Unconfirmed: whether `-f alpha` (mmng-ui's default, kept here) mangles HME numeric (type=1) pages; try `--decode-mode auto` or `standard` if they look wrong. Which Advisor button is Read vs Function is a guess (yellow = Read, red = Function).
+- Observed 2026-10-10: a page to pager 1 (870008) arrived as `Function: 0` but decoded cleanly as text (`5551212`) with `-f alpha`, so the transmitter sent the body as 7-bit alpha despite the "numeric" function bits. Keep `-f alpha`; `standard` mode trusts the function bits and would likely garble it. The protocol doc doesn't say how the unit encodes on air, and the user can't control it. Still unknown whether any page ever goes out BCD-numeric; if one shows up garbled, compare `--decode-mode auto`. Which Advisor button is Read vs Function is a guess (yellow = Read, red = Function).
 
 ## Conventions
 

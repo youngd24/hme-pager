@@ -56,7 +56,7 @@ def multimon_args(mode: str = "alpha", charset: str = "US") -> list[str]:
     args = ["-a", "POCSAG512", "-a", "POCSAG1200", "-a", "POCSAG2400"]
     if mode != "standard":
         args += ["-f", mode]
-    # mmng-ui also passes -u (prune unlikely POCSAG decodes); left out, it caused problems here.
+    # mmng-ui also passes -u (prune unlikely POCSAG decodes); left out, it made the output messier here.
     args += ["-t", "raw", "-q", "--timestamp", "-p", "-C", charset, "-"]
     return args
 

@@ -1,5 +1,7 @@
 # vpager: a virtual Motorola Advisor-style pager
 
+Version 0.1 (git tag `v0.1`). See [CHANGELOG.md](CHANGELOG.md).
+
 vpager is a virtual pager. It answers to one POCSAG capcode and shows that capcode's pages on a screen drawn to look like a Motorola Advisor alphanumeric pager from the early 1990s. You can change the capcode at any time.
 
 It is the receive side of this repo. `hmew_pager` sends pages through the HME/JTECH iStation transmitter; vpager receives them off the air through an RTL-SDR and shows the ones meant for "its" pager.
@@ -17,7 +19,7 @@ Python 3, standard library only. The pager face is a single local web page, so i
 ### Requirements
 
 - Python 3.9 or newer (developed and tested on 3.13).
-- [multimon-ng](https://github.com/EliasOenal/multimon-ng). vpager looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with the v1.3.1 build in `C:\rtl-sdr`.
+- [multimon-ng](https://github.com/EliasOenal/multimon-ng). vpager looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with multimon-ng 1.3.0 and 1.6.0 on Windows.
 - Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. The SDR++ network sink does this, with the same settings mmng-ui uses.
 
 ### Run
@@ -45,7 +47,7 @@ Once set, the capcode is saved. Later runs remember it, and you can also change 
 | `--http-host` | 127.0.0.1 | address for the pager page; `0.0.0.0` lets other machines (e.g. a phone) view it |
 | `--http-port` | 8073 | port for the pager page |
 | `--mmng` | `multimon-ng` | multimon-ng binary; a bare name is looked up on PATH, then in `C:\rtl-sdr` on Windows |
-| `--decode-mode` | `alpha` | multimon-ng `-f` mode: `alpha`, `numeric`, `auto`, or `standard` (no `-f`) |
+| `--decode-mode` | `alpha` | multimon-ng `-f` mode: `alpha`, `numeric`, `auto`, or `standard` (no `-f`). Keep `alpha` for the iStation; see "Decoder settings" below |
 | `--charset` | `US` | multimon-ng `-C` charset |
 | `--mmng-args "..."` | | replace all multimon-ng arguments |
 | `--dedupe S` | 10 | ignore an identical page (same capcode, function and text) within S seconds; 0 turns it off |
@@ -149,6 +151,10 @@ Hold On/Reset to show `PUSH FOR OFF`, then press Function to turn the pager off.
 - **Not Streamlit.** Streamlit reruns the whole script on the server for every click and has no clean way to push an incoming page to the browser. That makes timed button behavior laggy, and the custom drawing would have to live in an HTML component anyway.
 - **Standard library only.** `http.server` serves the page and server-sent events, `asyncio` runs UDP and the subprocess, and `logging` writes the log file. The same rule applies to the rest of the repo.
 - **Same input as mmng-ui.** vpager listens on UDP 8888 for the raw audio SDR++ already sends. The UDP-to-multimon-ng code is adapted from [mmng-ui](https://github.com/lingfish/mmng-ui), which is GPL-3.0 like this repo; attribution and a list of changes are in the header of `receiver.py`. Only one program can listen on a given port, so to run both, give vpager or mmng-ui a different port and add a second sink.
+- **Decoder settings.** vpager runs multimon-ng with mmng-ui's POCSAG arguments, minus `-u`:
+  `-a POCSAG512 -a POCSAG1200 -a POCSAG2400 -f alpha -t raw -q --timestamp -p -C US -`
+  - **`-f alpha` (force text decoding) is needed for the iStation.** POCSAG can encode a message body as numeric digits (4 bits each) or as 7-bit ASCII text, and the function bits conventionally say which (0 = numeric, 3 = alpha). The HMEW protocol document only describes what the PC sends; it doesn't say how the transmitter encodes pages on air, and you can't choose it. On 2026-10-10 a page to pager 1 (capcode 870008) arrived with `Function: 0`, which by convention means numeric, yet decoded cleanly as the text `5551212` under `-f alpha`. The unit therefore sent the body as text despite the numeric function bits. In `standard` mode multimon-ng trusts the function bits and would very likely garble such pages. If a page for your capcode ever shows up garbled, the unit may have sent real numeric encoding; try `--decode-mode auto` then.
+  - **`-u` (prune unlikely decodes) is left out.** It was tried with multimon-ng 1.3.0 and 1.6.0 and made the output messier, with stray address-only decodes for random capcodes. Those decodes are ignored by the capcode filter anyway; they only clutter the log. If noise is still a problem, dropping `-p` (show partial messages) is the next thing to try, through `--mmng-args`.
 - **The server owns the state; the browser owns the behavior.** Message memory and settings live on the server, so a page reload or a second browser shows the same pager. Screens, timers, sound and the LCD live in `pager.js`.
 - **Filter on the server, log everything.** Every decode for every capcode is logged with its verdict, so the log answers "did the radio hear it?" separately from "did the pager accept it?".
 - **Duplicate suppression.** An identical page within 10 s is shown only once. It isn't confirmed whether the iStation or the decoder ever repeats pages; this is a precaution.
@@ -231,7 +237,8 @@ msedge --headless=new --window-size=1000,560 --screenshot=shot.png "http://127.0
 
 ## Open questions
 
-- Does `--decode-mode alpha` (mmng-ui's default) garble HME numeric (`type=1`) pages? If it does, compare `auto` and `standard`.
+- Does the iStation ever send a page body with true numeric encoding? So far it has sent text even with `Function: 0` (see "Decoder settings"). If a garbled page for your capcode appears, compare `--decode-mode auto`.
+- What sets the function bits: keypad pages have decoded as Function 0, and earlier HTTP pages with `beep=1` as Function 1. It may be the beep setting or how the page was sent.
 - Which Advisor key is Read and which is Function (see Functionality).
 - Does the iStation repeat pages (affects `--dedupe`)?
 - A borderless, pager-shaped desktop window (pywebview) is planned but not built.
