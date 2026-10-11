@@ -1064,7 +1064,7 @@
       onNewPage(d.message);
     });
     es.addEventListener('error', () => {
-      $('#status-line').innerHTML = '<span class="bad">lost connection to capcoder — retrying…</span>';
+      $('#status-line').innerHTML = '<span class="bad">lost connection to Capcoder, retrying…</span>';
     });
   }
 

@@ -19,6 +19,7 @@ Everything is plain Python 3 with no third-party dependencies, so it runs as-is 
 | [`tests/`](tests/) | Unit tests for both sides. |
 | [`refdocs/`](refdocs/) | Reference documents: the HMEW Integration Protocol and the Motorola Advisor user manual. |
 | [`assets/`](assets/) | Images used in the docs. |
+| [`TODO.md`](TODO.md) | Open items for later. |
 
 ## Sending pages: `pager.py`
 
