@@ -2,7 +2,9 @@
 
 Releases of the whole repo, tagged in git. Capcoder's own detailed changes are in [capcoder/CHANGELOG.md](capcoder/CHANGELOG.md).
 
-## Unreleased (planned 0.3)
+## 0.3 (2026-10-11), git tag `v0.3`
+
+Tested on the real unit: with defaults from `config.example`, pages went out over both serial and the network and were received on Capcoder.
 
 **Sending (`hmew` library and `pager.py`)**
 - **A config file for defaults:** `~/.hme-pager/config` (INI, `[pager]` section), with `mode` (network or serial), `host`, `serial_port`, `base`, `type` (alpha or numeric) and `verbose` (default false). A template is in `config.example`.
@@ -14,7 +16,15 @@ Releases of the whole repo, tagged in git. Capcoder's own detailed changes are i
 - **No more environment variables.** `HMEWHOST`, `HMEWSERIAL` and `HMEWBASE` are no longer read, including by `HttpTransmitter`, which now requires a host.
 - **Config errors stop early.** A misspelled setting, an unknown section or a bad value is reported before anything is sent.
 - **`-v` shows where each setting came from** (the config file or an option).
+- **Serial permissions hint.** "Permission denied" when opening the serial port now says to add the user to the `dialout` group (Ubuntu/Debian).
 - Tests: `tests/test_hmew_config.py`.
+
+**Receiving:** Capcoder is unchanged; its version follows the release to 0.3.
+
+**Docs**
+- README: a configuration section with a table of which option overrides which setting, the new `--help` text, and verbose samples.
+- Serial details: the `dialout` group requirement.
+- Systems tested: Ubuntu 24.04 and Windows 11.
 
 ## 0.2 (2026-10-11), git tag `v0.2`
 

@@ -1,5 +1,9 @@
 # Mockorola Capcoder changelog
 
+## 0.3 (2026-10-11), git tag `v0.3`
+
+- No changes to Capcoder. The version follows the repo release, which was about the sender (see the top-level [CHANGELOG](../CHANGELOG.md)).
+
 ## 0.2 (2026-10-11), git tag `v0.2`
 
 - **Renamed vpager to Mockorola Capcoder.**
