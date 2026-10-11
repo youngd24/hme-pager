@@ -1,12 +1,13 @@
 # hme-pager
 
-Python client for the HME Wireless (HMEW) iStation paging transmitter, HTTP interface. Stdlib only, no pip dependencies, so it runs on a FreePBX box as-is.
+Python client for the HME Wireless (HMEW) iStation paging transmitter, over its HTTP interface or RS-232 (Scope protocol). Stdlib only, no pip dependencies, so it runs on a FreePBX box as-is (exception: serial on Windows uses pyserial if installed; Linux serial is stdlib termios).
 
 Goal: let a FreePBX IVR (or any script) send **numeric** pages to the transmitter. Planned hook-up is a Python AGI script that imports this package instead of using Asterisk's `CURL()`.
 
 ## Hardware and environment
 
-- Transmitter: JTECH/HME iStation (HME Wireless Computer Controlled Paging System), POCSAG at 457.5750 MHz (HME's standard US frequency), 1200 baud default.
+- Transmitter: JTECH/HME iStation, model **ISTATION-N**, firmware reporting `PVer: 2.48 RVer: 003` (HME Wireless Computer Controlled Paging System), POCSAG at 457.5750 MHz (HME's standard US frequency), 1200 baud default. Everything in this repo was built and tested against that unit.
+- Serial cable: straight-through RS-232 (not null-modem), DB9 male at the transmitter end; the transmitter's port is DB9 female. Connected to the user's Linux box (`/dev/ttyS0`).
 - Transmitter IP on the lab network: 192.168.42.66, port 80 (from the user's curl tests; confirm before hard-coding).
 - Reception/verification rig: RTL-SDR on Windows 10 (Zadig/WinUSB, `rtl_fm` piped to `multimon-ng`, or to `nc` to feed Capcoder over UDP). Decode command that works:
   `rtl_fm -f 457.5750M -s 22050 -g 30 - | multimon-ng -t raw -a POCSAG1200 -f alpha -`
@@ -40,47 +41,61 @@ Capcode = 3-digit base ID + (pager number x 8) as 4 digits. Examples seen on air
 
 Numeric pages: digits, space, `-`, `[`, `]`, and `U` (urgent); max 20 characters. These two limits are stated in the Scope (serial) section, not the HTTP section, so the HTTP path may be more permissive. We use the stricter limits.
 
+### Serial (Scope protocol, doc section 4.A)
+
+- RS-232 9600 8N1, no flow control. Command: type (`A`/`N`), `F` (1200 baud; always send it, per the doc and the user), 7-digit capcode, beep letter `A`-`D` (= beep 1-4), message, CR. E.g. `AF0870008ATest page\r`.
+- Observed on the user's Linux box (netsrv26, `/dev/ttyS0`): the unit answers `OK\r\n` and nothing else, ever. A bad capcode gets silence, no error. So the only failure serial can detect is "no OK within the timeout" (`NoReply`, 3 s).
+- Serial addresses full capcodes (HTTP takes pager numbers and adds the unit's base ID). Group pages = one command per capcode.
+- HTTP and serial are active on the unit at the same time.
+- Numeric pages over serial encode on air the same way as HTTP ones (user observed via Capcoder).
+- Serial alpha limit kept at 128 like HTTP, by the user's choice (doc allows 512-2000 depending on firmware).
+
 Network setup on the unit: SETUP, password 1173 for IP/port; SETUP, password 9731 for output format (SCOPE/HME recommended for the TCP/serial interface). Do not use ports 21, 23, 80, 99 for the listen port.
 
 ## Design (implemented in `hmew/`)
 
 ```
 hmew/
-  __init__.py   exports PagerClient, parse_reply, PageType, Baud, SendResult,
-                capcode_to_pager, pager_to_capcode, and the exceptions
-  errors.py     PagerError base; ValidationError, TransmitterUnreachable,
-                UnexpectedReply, PageRejected, QueueFull
-  models.py     enums, validation, SendResult, capcode helpers (no network)
-  client.py     PagerClient, parse_reply
+  __init__.py       exports HttpTransmitter, SerialTransmitter, PagerClient (= HttpTransmitter),
+                    Page, Transmitter, PageType, Baud, SendResult, capcode helpers, exceptions
+  errors.py         PagerError base; ValidationError, TransmitterUnreachable, TransmitterHTTPError,
+                    UnexpectedReply, PageRejected, QueueFull, NoReply (serial)
+  models.py         enums, message/pager/beep/capcode/base checks, SendResult, capcode helpers
+  page.py           Page (kind, msg, pagers or capcodes, beep, baud) and the Transmitter protocol
+  http_client.py    HttpTransmitter (was client.py / PagerClient), parse_reply
+  scope.py          Scope command bytes + ACK check; no I/O
+  serialport.py     open_port(): PosixPort (termios, flock exclusive lock, 10 s wait) or PySerialPort
+  serial_client.py  SerialTransmitter: capcodes (or pagers + base), one command per capcode, wait for OK
 ```
 
-Public API (package renamed from `hmew_pager` to `hmew`):
+Public API (package renamed from `hmew_pager` to `hmew`). Both transmitters have `send(page) -> SendResult`:
 
 ```python
-from hmew import PagerClient
-c = PagerClient("192.168.42.66", timeout=3.0)
-c.send_numeric(pager=3, msg="555-1212")           # -> SendResult(code="c", count=1, raw="!sc1")
-c.send_alpha(pager=3, msg="hello")
-c.send_numeric(pager=[1, 2, 3], msg="42", beep=2)  # group page
+from hmew import HttpTransmitter, SerialTransmitter, Page, PageType
+page = Page(PageType.ALPHA, "hello", pagers=(3,))
+HttpTransmitter("192.168.42.66").send(page)                 # SendResult(code="c", count=1, raw="!sc1")
+SerialTransmitter("/dev/ttyS0", base=87).send(page)         # SendResult(code="OK", count=1, raw="OK")
+SerialTransmitter("/dev/ttyS0").send(Page(PageType.ALPHA, "hi", capcodes=(870008,)))
+# Older calls still work: PagerClient("...").send_numeric(pager=3, msg="555-1212")
 ```
 
-`host` is optional; if omitted, `PagerClient()` reads it from the `HMEWHOST` environment variable. Raises `ValidationError` if neither is given.
+`HttpTransmitter` with `capcodes` raises `ValidationError` (HTTP can't address a capcode). `SerialTransmitter` with `pagers` needs `base`. `HttpTransmitter(host=None)` reads `HMEWHOST`.
 
 Decisions:
 - **Validate before sending.** Bad input raises `ValidationError` locally so a typo in the IVR can't become a stray page.
 - **Reply handling.** `!sc` returns `SendResult`. `!sd/!se/!sf/!sh` raise `PageRejected` (request was built wrong, not retryable). `!sg` raises `QueueFull`. Anything else raises `UnexpectedReply` with the raw text (reply parsing stays strict on purpose: the unit's PHP is rough, and the user prefers not to loosen it). An HTTP error status (404, 500, ...) raises `TransmitterHTTPError` (the unit answered); only no answer at all raises `TransmitterUnreachable`.
 - **Logging.** `hmew` logs to the `hmew` logger at DEBUG (page summary, request URL, reply with HTTP status and time, queue-full retries) and is silent unless the app configures logging. `pager.py -v` sends it to stderr. No log file for the sender (user's choice).
-- **Not doing:** beep/baud/group options in `pager.py` (the user says the transmitter and pagers don't need more than the defaults). Cross-process locking is deferred to the FreePBX work.
+- **Not doing:** beep/baud/group options in `pager.py` (the user says the transmitter and pagers don't need more than the defaults). Cross-process locking for HTTP is deferred to the FreePBX work; serial already has it (exclusive `flock` on the device, second sender waits up to 10 s).
 - **Queue-full retries.** Retry with exponential backoff only when `processed == 0`. If some pagers were accepted, raise `QueueFull` with `.processed` set, because resending the whole request would page those pagers twice.
 - **Serialized sends.** A `threading.Lock` around each request, since the doc describes a small input buffer and concurrent behavior is unknown.
 - **URL building.** `pager` is built by hand so the `+` separator isn't escaped; everything else goes through `urllib.parse.urlencode` with `quote_via=quote`, so spaces become `%20`. The default `+` for spaces went out on air as literal `+` signs (seen on Capcoder 2026-10-11): the unit's PHP doesn't decode `+` as a space. Confirmed on the real unit 2026-10-11: with `%20`, spaces arrive as spaces.
 
 ## Status
 
-- Package written and smoke-tested against a local fake HTTP server (URL shape, every reply code, retry rules, validation, unreachable host, capcode helpers). **Not yet tested against the real iStation.**
-- Command line: `pager.py` at the repo root. `python pager.py (-a|--alpha | -n|--numeric) -p|--pager N [-h|--host HOST[:PORT]] [-v|--verbose] message...`. `-a`/`-n` are mutually exclusive and one is required; `-h` is host, so help is `--help` only; host falls back to `HMEWHOST` (also accepts `host:port`); the message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors.
+- HTTP sending works against the real iStation (pages received on Capcoder). Serial: the user's own pyserial test script worked against the unit; the `hmew` serial code is tested against fake ports and a Linux pty, **not yet against the real unit**.
+- Command line: `pager.py` at the repo root. `python pager.py (-a | -n) (-p N | -c CAPCODE) (-h HOST[:PORT] | -s DEVICE) [--base NNN] [-v] message...`. Pairs `-a`/`-n`, `-p`/`-c`, `-h`/`-s` are each mutually exclusive with one required (`-h`/`-s` may come from `HMEWHOST`/`HMEWSERIAL`; both env vars set without a flag is an error). `-c` is serial only; `-p` over serial needs `--base`/`HMEWBASE`. `-h` is host, so help is `--help` only. The message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors (including serial `NoReply`).
 - Message checks (`models.validate_message`): numeric = only digits, space, `-`, `[`, `]`, `U`, max 20 (empty allowed: type 1 is also "vibe only"); alpha = printable ASCII only (no control chars), not empty/all spaces, max 128 bytes. Errors name the offending characters.
-- Tests: `tests/test_hmew.py` (message checks + CLI against a fake transmitter on 127.0.0.1).
+- Tests: `tests/test_hmew.py` (message checks + HTTP CLI against a fake transmitter on 127.0.0.1); `tests/test_hmew_serial.py` (Scope bytes, capcode rules, SerialTransmitter and serial CLI with a fake port; `PosixPortTests` use a pty and are skipped on Windows; run them in WSL: `wsl -d Ubuntu --cd /mnt/c/Users/youngd/src/hme-pager -- python3 -m unittest tests.test_hmew_serial`).
 - Not written yet: the FreePBX AGI wrapper (set aside for later), packaging.
 
 ## Open questions (test on the real unit)

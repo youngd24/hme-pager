@@ -29,6 +29,20 @@ class TransmitterHTTPError(PagerError):
         self.body = body
 
 
+class NoReply(PagerError):
+    """Serial: the transmitter didn't say OK in time.
+
+    The unit gives no error reply at all (a bad capcode just gets silence), so
+    this is the only failure serial can report. ``sent`` is how many commands
+    were acknowledged before this one, so callers can avoid double-paging.
+    """
+
+    def __init__(self, message: str, sent: int, raw: bytes):
+        super().__init__(message)
+        self.sent = sent
+        self.raw = raw
+
+
 class UnexpectedReply(PagerError):
     """Reply did not match the documented ``!s<code><n>`` format."""
 

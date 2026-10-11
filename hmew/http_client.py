@@ -29,6 +29,7 @@ from .models import (
     validate_message,
     validate_pagers,
 )
+from .page import Page
 
 _REPLY_RE = re.compile(r"!s([a-z])(\d+)")
 
@@ -51,7 +52,12 @@ def parse_reply(raw: str) -> SendResult:
     raise UnexpectedReply(raw)
 
 
-class PagerClient:
+class HttpTransmitter:
+    """Sends pages through the transmitter's send_page.php (HMEW doc section 4.D).
+
+    Addresses pagers by number (1-999); the transmitter adds its own base ID.
+    """
+
     def __init__(
         self,
         host: Optional[str] = None,
@@ -71,6 +77,15 @@ class PagerClient:
         self._lock = threading.Lock()  # serialize requests to the transmitter
 
     # -- public API ---------------------------------------------------------
+
+    def send(self, page: Page) -> SendResult:
+        page.check()
+        if page.capcodes:
+            raise ValidationError(
+                "HTTP sends by pager number and the transmitter adds its base ID; "
+                "use a pager number, or send by capcode over serial"
+            )
+        return self._send(list(page.pagers), page.kind, page.msg, page.baud, page.beep)
 
     def send_numeric(
         self, pager: PagerArg, msg: str, beep: int = 1, baud: Baud = Baud.B1200
@@ -161,3 +176,7 @@ class PagerClient:
             ) from exc
         log.debug("reply %r (HTTP %s) in %.0f ms", raw, status, (time.monotonic() - started) * 1000)
         return raw
+
+
+# The original name, kept so existing code keeps working.
+PagerClient = HttpTransmitter

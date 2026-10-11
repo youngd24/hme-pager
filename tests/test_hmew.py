@@ -92,7 +92,7 @@ class FakeTransmitter:
 class CommandLineTests(unittest.TestCase):
     def setUp(self):
         self.tx = FakeTransmitter()
-        env = {k: v for k, v in os.environ.items() if k != "HMEWHOST"}
+        env = {k: v for k, v in os.environ.items() if k not in ("HMEWHOST", "HMEWSERIAL", "HMEWBASE")}
         self.env = mock.patch.dict(os.environ, env, clear=True)
         self.env.start()
 

@@ -113,6 +113,32 @@ class SendResult:
     raw: str       # raw reply, e.g. "!sc1"
 
 
+CAPCODE_MIN, CAPCODE_MAX = 8, 2097143
+BASE_MIN, BASE_MAX = 0, 209   # base*10000 + pager*8 must stay a valid capcode
+# Capcodes the transmitter rejects, per the protocol doc (Waveware error 03):
+# 0-7, 2007664-2007671, 2045056-2045063, 2097144 and up.
+_RESERVED_CAPCODES = (range(2007664, 2007672), range(2045056, 2045064))
+
+
+def validate_capcode(capcode: int) -> int:
+    if isinstance(capcode, bool) or not isinstance(capcode, int):
+        raise ValidationError(f"capcode must be an int, got {capcode!r}")
+    if not CAPCODE_MIN <= capcode <= CAPCODE_MAX or any(capcode in r for r in _RESERVED_CAPCODES):
+        raise ValidationError(
+            f"capcode {capcode:07d} is not valid (the transmitter rejects 0-7, "
+            "2007664-2007671, 2045056-2045063 and 2097144 up)"
+        )
+    return capcode
+
+
+def validate_base(base: int) -> int:
+    if isinstance(base, bool) or not isinstance(base, int):
+        raise ValidationError(f"base ID must be an int, got {base!r}")
+    if not BASE_MIN <= base <= BASE_MAX:
+        raise ValidationError(f"base ID must be {BASE_MIN:03d}-{BASE_MAX:03d}, got {base}")
+    return base
+
+
 def pager_to_capcode(base_id: int, pager: int) -> int:
     """Capcode = base ID (3 digits) followed by pager*8 (4 digits)."""
     return base_id * 10000 + pager * 8
