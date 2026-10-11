@@ -122,6 +122,21 @@ class CommandLineTests(unittest.TestCase):
         q = self.tx.last_query()
         self.assertEqual((q["pager"], q["type"], q["msg"]), ("7", "2", "Barcode Error Aisle 3"))
 
+    def test_spaces_sent_as_percent20_not_plus(self):
+        # The transmitter doesn't decode '+' as a space; it showed up on the pager.
+        code, _, _ = self.run_cli("-a", "-p", "1", "-h", self.tx.host, "TAPE VOL NOT", "MOUNTED")
+        self.assertEqual(code, 0)
+        raw = urlsplit(self.tx.requests[-1]).query
+        self.assertIn("msg=TAPE%20VOL%20NOT%20MOUNTED", raw)
+        self.assertNotIn("TAPE+VOL", raw)
+        # a real '+' in the message is still encoded, so it can't be mistaken for anything else
+        self.run_cli("-a", "-p", "1", "-h", self.tx.host, "1+1")
+        self.assertIn("msg=1%2B1", urlsplit(self.tx.requests[-1]).query)
+        # group separator between pager numbers stays a literal '+'
+        from hmew import PagerClient
+        url = PagerClient("h").build_url([1, 2, 3], PageType.ALPHA, "a b", 1, 1)
+        self.assertIn("pager=1+2+3&", url)
+
     def test_options_after_message(self):
         code, _, _ = self.run_cli("hello", "-a", "-p", "1", "-h", self.tx.host)
         self.assertEqual(code, 0)

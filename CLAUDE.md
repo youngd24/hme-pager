@@ -73,7 +73,7 @@ Decisions:
 - **Not doing:** beep/baud/group options in `pager.py` (the user says the transmitter and pagers don't need more than the defaults). Cross-process locking is deferred to the FreePBX work.
 - **Queue-full retries.** Retry with exponential backoff only when `processed == 0`. If some pagers were accepted, raise `QueueFull` with `.processed` set, because resending the whole request would page those pagers twice.
 - **Serialized sends.** A `threading.Lock` around each request, since the doc describes a small input buffer and concurrent behavior is unknown.
-- **URL building.** `pager` is built by hand so the `+` separator isn't escaped; everything else goes through `urllib.parse.urlencode`.
+- **URL building.** `pager` is built by hand so the `+` separator isn't escaped; everything else goes through `urllib.parse.urlencode` with `quote_via=quote`, so spaces become `%20`. The default `+` for spaces went out on air as literal `+` signs (seen on Capcoder 2026-10-11): the unit's PHP doesn't decode `+` as a space. Confirmed on the real unit 2026-10-11: with `%20`, spaces arrive as spaces.
 
 ## Status
 

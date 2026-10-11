@@ -89,13 +89,16 @@ class PagerClient:
     ) -> str:
         # '+' separates pager numbers per the doc, so it must not be escaped.
         pager_str = "+".join(str(p) for p in pagers)
+        # Spaces as %20, not urlencode's default '+': the transmitter doesn't turn
+        # '+' back into a space, so it went out on air as a literal '+'.
         rest = urllib.parse.urlencode(
             {
                 "type": int(page_type),
                 "msg": msg,
                 "baud": int(baud),
                 "beep": beep,
-            }
+            },
+            quote_via=urllib.parse.quote,
         )
         netloc = self.host if self.port == 80 else f"{self.host}:{self.port}"
         return f"http://{netloc}/send_page.php?pager={pager_str}&{rest}"
