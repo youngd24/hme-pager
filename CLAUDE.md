@@ -42,10 +42,10 @@ Numeric pages: digits, space, `-`, `[`, `]`, and `U` (urgent); max 20 characters
 
 Network setup on the unit: SETUP, password 1173 for IP/port; SETUP, password 9731 for output format (SCOPE/HME recommended for the TCP/serial interface). Do not use ports 21, 23, 80, 99 for the listen port.
 
-## Design (implemented in `hmew_pager/`)
+## Design (implemented in `hmew/`)
 
 ```
-hmew_pager/
+hmew/
   __init__.py   exports PagerClient, parse_reply, PageType, Baud, SendResult,
                 capcode_to_pager, pager_to_capcode, and the exceptions
   errors.py     PagerError base; ValidationError, TransmitterUnreachable,
@@ -54,9 +54,10 @@ hmew_pager/
   client.py     PagerClient, parse_reply
 ```
 
-Public API:
+Public API (package renamed from `hmew_pager` to `hmew`):
 
 ```python
+from hmew import PagerClient
 c = PagerClient("192.168.42.66", timeout=3.0)
 c.send_numeric(pager=3, msg="555-1212")           # -> SendResult(code="c", count=1, raw="!sc1")
 c.send_alpha(pager=3, msg="hello")
@@ -75,7 +76,10 @@ Decisions:
 ## Status
 
 - Package written and smoke-tested against a local fake HTTP server (URL shape, every reply code, retry rules, validation, unreachable host, capcode helpers). **Not yet tested against the real iStation.**
-- Not written yet: `cli.py` (`python -m hmew_pager send --pager 3 --msg 555-1212`), a proper `tests/` folder (the smoke test was a throwaway script; port it to unittest/pytest with a fake HTTP server), the FreePBX AGI wrapper, packaging.
+- Command line: `pager.py` at the repo root. `python pager.py (-a|--alpha | -n|--numeric) -p|--pager N [-h|--host HOST[:PORT]] message...`. `-a`/`-n` are mutually exclusive and one is required; `-h` is host, so help is `--help` only; host falls back to `HMEWHOST` (also accepts `host:port`); the message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors.
+- Message checks (`models.validate_message`): numeric = only digits, space, `-`, `[`, `]`, `U`, max 20 (empty allowed: type 1 is also "vibe only"); alpha = printable ASCII only (no control chars), not empty/all spaces, max 128 bytes. Errors name the offending characters.
+- Tests: `tests/test_hmew.py` (message checks + CLI against a fake transmitter on 127.0.0.1).
+- Not written yet: the FreePBX AGI wrapper (set aside for later), packaging.
 
 ## Open questions (test on the real unit)
 

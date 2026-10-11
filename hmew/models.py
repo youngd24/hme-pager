@@ -20,7 +20,7 @@ NUMERIC_MAX_LEN = 20      # stated in the Scope section
 ALPHA_MAX_BYTES = 128     # stated in the HTTP section
 
 # Digits, space, hyphen, square brackets, and 'U' (urgent) per the Scope section.
-_NUMERIC_RE = re.compile(r"^[0-9 \-\[\]U]*$")
+_NUMERIC_RE = re.compile(r"[0-9 \-\[\]U]")   # one allowed character
 
 
 class PageType(enum.IntEnum):
@@ -62,26 +62,47 @@ def validate_beep(beep: int) -> int:
     return beep
 
 
+def _describe(chars: Iterable[str]) -> str:
+    return ", ".join(repr(c) for c in sorted(set(chars)))
+
+
 def validate_message(msg: str, page_type: PageType) -> str:
+    """Check the message really is numeric or alpha text, per page_type.
+
+    Numeric: only digits, space, '-', '[', ']' and 'U'; at most 20 characters.
+    An empty numeric message is allowed (type 1 is also "vibe only"; how the
+    unit treats it is unconfirmed).
+    Alpha: printable ASCII only (space to '~'; no tabs, newlines or other
+    control characters); not empty or all spaces; at most 128 bytes.
+    """
     if not isinstance(msg, str):
         raise ValidationError("message must be a string")
     if page_type is PageType.VIBE_NUMERIC:
+        bad = [c for c in msg if not _NUMERIC_RE.fullmatch(c)]
+        if bad:
+            hint = " (send text as alpha)" if any(c.isalpha() for c in bad) else ""
+            raise ValidationError(
+                "numeric message may only contain digits, space, '-', '[', ']' and 'U'; "
+                f"found {_describe(bad)}{hint}"
+            )
         if len(msg) > NUMERIC_MAX_LEN:
             raise ValidationError(
                 f"numeric message max {NUMERIC_MAX_LEN} chars, got {len(msg)}"
             )
-        if not _NUMERIC_RE.match(msg):
-            raise ValidationError(
-                "numeric message may only contain digits, space, '-', '[', ']', 'U'"
-            )
     else:
-        n = len(msg.encode("utf-8"))
+        if not msg.strip():
+            raise ValidationError("alpha message is empty")
+        bad = [c for c in msg if not " " <= c <= "~"]
+        if bad:
+            raise ValidationError(
+                "alpha message may only contain printable ASCII (letters, digits, "
+                f"punctuation, space); found {_describe(bad)}"
+            )
+        n = len(msg.encode("ascii"))
         if n > ALPHA_MAX_BYTES:
             raise ValidationError(
                 f"alpha message max {ALPHA_MAX_BYTES} bytes, got {n}"
             )
-        if not msg.isascii():
-            raise ValidationError("alpha message must be ASCII")
     return msg
 
 

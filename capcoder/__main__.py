@@ -112,7 +112,7 @@ def cmd_run(args) -> int:
             if args.pager is None or args.base is None:
                 log.error("--base and --pager must be used together")
                 return 2
-            from hmew_pager.models import pager_to_capcode
+            from hmew.models import pager_to_capcode
             store.apply("capcode", value=pager_to_capcode(args.base, args.pager))
     except StoreError as e:
         log.error("bad capcode: %s", e)

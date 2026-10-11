@@ -4,7 +4,7 @@ Version 0.1 (git tag `v0.1`, released under the old name `vpager`). See [CHANGEL
 
 Mockorola Capcoder ("Capcoder" for short; the package and command are `capcoder`) is a virtual pager. The name is a nod to the Motorola Advisor it imitates: a mock Motorola that decodes capcodes. It answers to one POCSAG capcode and shows that capcode's pages on a screen drawn to look like a Motorola Advisor alphanumeric pager from the early 1990s. You can change the capcode at any time.
 
-It is the receive side of this repo. `hmew_pager` sends pages through the HME/JTECH iStation transmitter; Capcoder receives them off the air through an RTL-SDR and shows the ones meant for "its" pager.
+It is the receive side of this repo. `hmew` sends pages through the HME/JTECH iStation transmitter; Capcoder receives them off the air through an RTL-SDR and shows the ones meant for "its" pager.
 
 ```
 iStation ──RF 457.575 MHz──▶ RTL-SDR ──▶ SDR++ ──UDP audio :8888──▶ Capcoder ──▶ browser
@@ -20,7 +20,7 @@ Python 3, standard library only. The pager face is a single local web page, so i
 
 - Python 3.9 or newer (developed and tested on 3.13).
 - [multimon-ng](https://github.com/EliasOenal/multimon-ng). Capcoder looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with multimon-ng 1.3.0 and 1.6.0 on Windows.
-- Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. The SDR++ network sink does this, with the same settings mmng-ui uses.
+- Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. The SDR++ network sink does this, with the same settings mmng-ui uses, and so does `rtl_fm` piped into netcat (see "Sending audio from an RTL-SDR machine" below).
 
 ### Run
 
@@ -34,11 +34,28 @@ python -m capcoder --mmng C:\tools\multimon-ng.exe --capcode 870024
 
 This opens `http://127.0.0.1:8073/` in its own browser window, separate from your other tabs, so you can size and place it on its own. The page scales the pager to fit the window. Capcoder uses the app mode of Edge, Chrome or Chromium (`--app=URL`, no tabs or address bar), whichever it finds first; with none of them it falls back to a tab in your default browser. Use `--tab` for a normal tab, or `--browser PATH` to pick the browser.
 
-Point SDR++'s network sink at UDP port 8888 on this machine. Click the page once so the browser allows sound.
+Point SDR++'s network sink, or the `rtl_fm` command below, at UDP port 8888 on this machine. Click the page once so the browser allows sound.
 
 Run one copy per set of ports. A second copy on the same HTTP port exits with "Is Capcoder already running?". If the UDP port is held by another program, such as mmng-ui, Capcoder shows `port 8888 in use, retrying` and takes the port once it is free.
 
 Once set, the capcode is saved. Later runs remember it, and you can also change it from the pager's own menu.
+
+### Sending audio from an RTL-SDR machine
+
+The RTL-SDR dongle doesn't have to be on the machine running Capcoder. On the machine with the dongle, demodulate with `rtl_fm` and send the audio over the network with netcat:
+
+```
+rtl_fm -f 457.5755M -s 22050 -g 30 - | nc -u -w1 <capcoder-host> 8888
+```
+
+- `<capcoder-host>` is the IP address or name of the machine running Capcoder. Use `127.0.0.1` if the dongle is on the same machine.
+- `-f 457.5755M` is the frequency to tune. HMEW's standard US frequency is 457.5750 MHz; this example is 500 Hz higher. Adjust the value, or use `rtl_fm -p <ppm>`, to suit your dongle.
+- `-s 22050` sets the output sample rate to 22050 Hz, which is what multimon-ng expects. `rtl_fm` sends FM-demodulated, 16-bit signed mono audio by default, so no other conversion is needed.
+- `-g 30` is the tuner gain. Too much gain overloads the front end, especially near the transmitter, so keep the dongle away from it.
+- `nc -u` sends over UDP; `-w1` is netcat's timeout. On Windows, Nmap's `ncat -u` does the same job.
+- On the Capcoder machine, allow inbound UDP 8888 through the firewall. Windows usually asks the first time Capcoder listens. Capcoder listens for audio on all network interfaces (`--udp-bind`), while the pager page stays on `127.0.0.1` unless you change `--http-host`.
+
+When audio arrives, the status line under the pager shows `receiving from <sender>` and the log records `audio from <sender>`. If the status line stays `idle`, the audio isn't arriving: check the address, the port and the firewall.
 
 ### Options
 
@@ -82,7 +99,7 @@ python -m capcoder inject --line "POCSAG1200: Address:  870024  Function: 1  Alp
 
 `inject` is accepted only from the same machine.
 
-To send a real page over the air, use the sender in this repo (`hmew_pager`) and point it at a lab test capcode. Never send test pages to customer pagers.
+To send a real page over the air, use the sender in this repo (`hmew`) and point it at a lab test capcode. Never send test pages to customer pagers.
 
 ## Layout
 
@@ -242,7 +259,7 @@ http://127.0.0.1:8073/?keys=func,right&step=0    # global menu, all keys at once
 msedge --headless=new --window-size=1000,560 --screenshot=shot.png "http://127.0.0.1:8073/?step=0&keys=read,read"
 ```
 
-**End to end:** run Capcoder with SDR++ sending audio, then page the test capcode with `hmew_pager`. Check that the status line shows `receiving` and that the decode appears in the log.
+**End to end:** run Capcoder with SDR++ sending audio, then page the test capcode with `hmew`. Check that the status line shows `receiving` and that the decode appears in the log.
 
 ## Open questions
 
