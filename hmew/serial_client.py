@@ -67,9 +67,9 @@ class SerialTransmitter:
                     already = f"; {sent} of {len(capcodes)} capcodes were sent before this" if sent else ""
                     raise NoReply(
                         f"no OK from the transmitter for capcode {capcode:07d} within "
-                        f"{self.timeout:.0f} s (got {reply!r}). The unit gives no error reply, "
-                        f"so a bad capcode looks like this; also check the cable, the port and "
-                        f"that the unit's output format is SCOPE{already}",
+                        f"{self.timeout:.0f} s (got {reply!r}). The unit sends no error replies; "
+                        f"check the cable (straight-through), the port, and that the unit's "
+                        f"output format is SCOPE{already}",
                         sent, reply,
                     )
                 log.debug("reply %r in %.0f ms", reply, elapsed)

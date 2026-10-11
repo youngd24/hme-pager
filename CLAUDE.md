@@ -44,7 +44,7 @@ Numeric pages: digits, space, `-`, `[`, `]`, and `U` (urgent); max 20 characters
 ### Serial (Scope protocol, doc section 4.A)
 
 - RS-232 9600 8N1, no flow control. Command: type (`A`/`N`), `F` (1200 baud; always send it, per the doc and the user), 7-digit capcode, beep letter `A`-`D` (= beep 1-4), message, CR. E.g. `AF0870008ATest page\r`.
-- Observed on the user's Linux box (netsrv26, `/dev/ttyS0`): the unit answers `OK\r\n` and nothing else, ever. A bad capcode gets silence, no error. So the only failure serial can detect is "no OK within the timeout" (`NoReply`, 3 s).
+- Observed on the user's Linux box (netsrv26, `/dev/ttyS0`): the unit answers `OK\r\n` and nothing else, ever. 2026-10-11: it also answered `OK` for capcode 0870001 (valid POCSAG, not a multiple of 8, no pager has it), so it accepts any valid capcode. The capcodes it rejects per the doc are blocked locally before sending. So the only failure serial can detect is "no OK within the timeout" (`NoReply`, 3 s), and in practice that means cable/port/output-format problems, not a bad capcode. (The user's earlier "blank for a bad capcode" note was before this test.)
 - Serial addresses full capcodes (HTTP takes pager numbers and adds the unit's base ID). Group pages = one command per capcode.
 - HTTP and serial are active on the unit at the same time.
 - Numeric pages over serial encode on air the same way as HTTP ones (user observed via Capcoder).
@@ -92,7 +92,7 @@ Decisions:
 
 ## Status
 
-- HTTP sending works against the real iStation (pages received on Capcoder). Serial: the user's own pyserial test script worked against the unit; the `hmew` serial code is tested against fake ports and a Linux pty, **not yet against the real unit**.
+- HTTP sending works against the real iStation (pages received on Capcoder). Serial: `pager.py -s /dev/ttyS0` works against the real unit (2026-10-11, netsrv26: `AF0870008ASerial test\r` -> `OK` in 34 ms), on top of tests with fake ports and a Linux pty.
 - Command line: `pager.py` at the repo root. `python pager.py (-a | -n) (-p N | -c CAPCODE) (-h HOST[:PORT] | -s DEVICE) [--base NNN] [-v] message...`. Pairs `-a`/`-n`, `-p`/`-c`, `-h`/`-s` are each mutually exclusive with one required (`-h`/`-s` may come from `HMEWHOST`/`HMEWSERIAL`; both env vars set without a flag is an error). `-c` is serial only; `-p` over serial needs `--base`/`HMEWBASE`. `-h` is host, so help is `--help` only. The message is the only positional (words joined with single spaces). Message checked before anything is sent; exit 2 for usage/validation errors, 1 for transmitter/network errors (including serial `NoReply`).
 - Message checks (`models.validate_message`): numeric = only digits, space, `-`, `[`, `]`, `U`, max 20 (empty allowed: type 1 is also "vibe only"); alpha = printable ASCII only (no control chars), not empty/all spaces, max 128 bytes. Errors name the offending characters.
 - Tests: `tests/test_hmew.py` (message checks + HTTP CLI against a fake transmitter on 127.0.0.1); `tests/test_hmew_serial.py` (Scope bytes, capcode rules, SerialTransmitter and serial CLI with a fake port; `PosixPortTests` use a pty and are skipped on Windows; run them in WSL: `wsl -d Ubuntu --cd /mnt/c/Users/youngd/src/hme-pager -- python3 -m unittest tests.test_hmew_serial`).

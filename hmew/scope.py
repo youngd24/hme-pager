@@ -6,8 +6,8 @@ A command is: type, 'F' for 1200 baud, 7-digit capcode, beep letter, message, CR
     NF0870008A5551212\\r       numeric page
 
 The transmitter answers OK<CR><LF> when it takes a command (observed; the doc
-doesn't specify). It gives no error reply at all, e.g. a bad capcode just gets
-silence, so anything other than OK in time counts as failure.
+doesn't specify) and never sends an error reply. It says OK for any valid
+capcode, even one no pager uses. Anything other than OK in time counts as failure.
 """
 
 from __future__ import annotations

@@ -32,9 +32,11 @@ class TransmitterHTTPError(PagerError):
 class NoReply(PagerError):
     """Serial: the transmitter didn't say OK in time.
 
-    The unit gives no error reply at all (a bad capcode just gets silence), so
-    this is the only failure serial can report. ``sent`` is how many commands
-    were acknowledged before this one, so callers can avoid double-paging.
+    The unit only ever answers OK, so silence is the only failure serial can
+    report. It answers OK for any valid capcode (even one no pager uses), so in
+    practice this means a cable, port or unit-setting problem. ``sent`` is how
+    many commands were acknowledged before this one, so callers can avoid
+    double-paging.
     """
 
     def __init__(self, message: str, sent: int, raw: bytes):

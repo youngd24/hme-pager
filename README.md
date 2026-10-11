@@ -89,7 +89,7 @@ Capcode = 3-digit base ID followed by pager × 8 as 4 digits. For example, base 
 - **Cable:** a straight-through RS-232 cable (not a null-modem cable) with a DB9 male connector at the transmitter end. The transmitter's serial port is a DB9 female.
 - **Format:** the Scope format (HMEW doc section 4.A), for example `AF0870008ATest page` followed by a carriage return. The parts are the type (`A` alpha, `N` numeric), `F` for 1200 baud (always sent, as the doc says), the 7-digit capcode, beep `A`, and the message.
 - **Port settings:** 9600 baud, 8 data bits, no parity, 1 stop bit, no flow control.
-- **Reply:** the unit answers `OK` when it accepts a command, and nothing else, ever. A bad capcode just gets silence. So no `OK` within 3 seconds is reported as an error, with a reminder that a bad capcode looks exactly like that.
+- **Reply:** the unit answers `OK` when it accepts a command, and never sends an error reply. It says `OK` for any valid capcode, even one no pager uses (0870001 was accepted in testing). Capcodes the unit rejects are refused by `pager.py` before sending, so in practice no `OK` within 3 seconds means a cable, port or unit-setting problem, and the error says to check those.
 - **Group pages:** each capcode gets its own command. If one goes unanswered, the error says how many were already sent, so you don't page those people twice.
 - **One sender at a time:** while a page is being sent, the serial port is locked, and a second sender waits up to 10 seconds for its turn.
 - **Linux and macOS** need nothing extra; the serial code uses only the standard library. **Windows** needs the `pyserial` package for serial; HTTP needs nothing.
