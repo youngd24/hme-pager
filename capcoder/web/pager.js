@@ -418,7 +418,7 @@
           for (let r = 0; r < ROWS; r++) f.line(r, ICON.BLOCK.repeat(COLS));
           return f;
         }
-        f.line(1, center('VIRTUAL PAGER'));
+        f.line(1, center('MOCKOROLA CAPCODER'));
         f.line(2, center(S.capcode ? `CAP ${String(S.capcode).padStart(7, '0')}` : 'NO CAPCODE SET'));
         return f;
       },
@@ -1031,7 +1031,7 @@
     $('#decode-line').textContent = d
       ? `last decode ${new Date(d.time).toLocaleTimeString()}: ${d.capcode} fn ${d.function} ${d.kind} "${d.text}" → ${d.verdict}`
       : 'no decodes yet';
-    $('#log-line').textContent = `vpager ${S.version || '?'}` + (S.log_file ? ` · log: ${S.log_file}` : '');
+    $('#log-line').textContent = `Mockorola Capcoder ${S.version || '?'}` + (S.log_file ? ` · log: ${S.log_file}` : '');
   }
 
   // ------------------------------------------------------------------ fit to window
@@ -1064,7 +1064,7 @@
       onNewPage(d.message);
     });
     es.addEventListener('error', () => {
-      $('#status-line').innerHTML = '<span class="bad">lost connection to vpager — retrying…</span>';
+      $('#status-line').innerHTML = '<span class="bad">lost connection to capcoder — retrying…</span>';
     });
   }
 

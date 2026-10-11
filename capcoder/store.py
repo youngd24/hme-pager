@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 from .decode import Page
 
-log = logging.getLogger("vpager.store")
+log = logging.getLogger("capcoder.store")
 
 MAX_SLOTS = 19
 MAX_LOCKED = 10

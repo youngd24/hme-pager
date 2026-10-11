@@ -17,7 +17,7 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
-log = logging.getLogger("vpager.launch")
+log = logging.getLogger("capcoder.launch")
 
 # Fits the pager plus the status lines under it; the page scales to any size.
 WINDOW_SIZE = (880, 760)

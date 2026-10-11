@@ -1,7 +1,13 @@
-# vpager changelog
+# Mockorola Capcoder changelog
 
 ## Unreleased
 
+- **Renamed vpager to Mockorola Capcoder.**
+  - The package and command are now `capcoder` (`python -m capcoder`).
+  - The case badge reads MOCKOROLA / CAPCODER.
+  - The log file is now `capcoder.log` and the logger names start with `capcoder.`.
+  - The data directory is now `~/.capcoder` (Windows) or `capcoder` (macOS/Linux). An existing vpager data directory is moved there on first run.
+  - Tests moved to `tests/test_capcoder.py`.
 - The pager now opens in its own resizable window by default, using Edge/Chrome/Chromium app mode, rather than a tab in an existing browser window. `--tab` restores the old behavior, and `--browser PATH` picks the browser.
 - If the UDP audio port is busy, vpager now retries every 5 s and takes the port once it is free. Before, it logged an error once and never received audio. While it waits, the status line shows `port N in use, retrying`.
 - Only one copy can run per port on Windows. Both ports are opened for exclusive use. A second vpager on the same HTTP port now exits with "Is vpager already running?" instead of quietly sharing the port.
@@ -9,7 +15,7 @@
 
 ## 0.1 (2026-10-10), git tag `v0.1`
 
-This is the first release. On 2026-10-10 it received a real over-the-air page from the iStation (pager 1, capcode 870008, `5551212`) and displayed it.
+This is the first release, under the old name **vpager**; names and paths below are as they were then. On 2026-10-10 it received a real over-the-air page from the iStation (pager 1, capcode 870008, `5551212`) and displayed it.
 
 - Listens for raw UDP audio on port 8888 (the SDR++ network sink) and decodes it with multimon-ng. The pipeline is adapted from mmng-ui.
 - Answers to one capcode, set with `--capcode`, with `--base`/`--pager`, or from the pager's menu. Every other decode is logged and ignored. An identical page within 10 s is dropped as a duplicate.

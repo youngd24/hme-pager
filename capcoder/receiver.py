@@ -29,8 +29,8 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from .core import Core
 
-log = logging.getLogger("vpager.receiver")
-mmng_log = logging.getLogger("vpager.multimon")
+log = logging.getLogger("capcoder.receiver")
+mmng_log = logging.getLogger("capcoder.multimon")
 
 IDLE_AFTER = 5.0            # seconds without packets before we call the feed idle
 RESTART_DELAY = 3.0         # seconds before restarting multimon-ng after it exits
@@ -198,7 +198,7 @@ class Receiver:
                 failures += 1
                 if failures == 1:
                     log.error(
-                        "cannot listen on UDP port %d: %s. Is another program (or another vpager) "
+                        "cannot listen on UDP port %d: %s. Is another program (or another capcoder) "
                         "using it? Retrying every %.0f s.", self.port, e, BIND_RETRY)
                 else:
                     log.debug("UDP port %d still unavailable (attempt %d): %s", self.port, failures, e)

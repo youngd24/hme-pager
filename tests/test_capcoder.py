@@ -4,9 +4,9 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from vpager.core import Core, Hub
-from vpager.decode import parse_line
-from vpager.store import MAX_LOCKED, MAX_PERSONAL, MAX_SLOTS, Store, StoreError
+from capcoder.core import Core, Hub
+from capcoder.decode import parse_line
+from capcoder.store import MAX_LOCKED, MAX_PERSONAL, MAX_SLOTS, Store, StoreError
 
 
 def line(capcode=870024, function=1, kind="Alpha", text="555-1212"):

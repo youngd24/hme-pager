@@ -1,9 +1,9 @@
 """Command line.
 
-    python -m vpager --capcode 870024            run the pager (opens its own browser window)
-    python -m vpager --base 87 --pager 3         same capcode, from base ID + pager number
-    python -m vpager inject "555-1212"           send a fake decode to the running pager
-    python -m vpager inject --line "POCSAG1200: Address:  870024  Function: 1  Alpha:   HI"
+    python -m capcoder --capcode 870024            run the pager (opens its own browser window)
+    python -m capcoder --base 87 --pager 3         same capcode, from base ID + pager number
+    python -m capcoder inject "555-1212"           send a fake decode to the running pager
+    python -m capcoder inject --line "POCSAG1200: Address:  870024  Function: 1  Alpha:   HI"
 """
 
 from __future__ import annotations
@@ -21,19 +21,19 @@ from pathlib import Path
 from . import __version__
 from .core import Core, Hub
 from .launch import open_ui
-from .logsetup import default_data_dir, setup_logging
+from .logsetup import default_data_dir, migrate_old_data_dir, setup_logging
 from .receiver import DECODE_MODES, Receiver, multimon_args
 from .server import PagerServer
 from .store import Store, StoreError
 
-log = logging.getLogger("vpager")
+log = logging.getLogger("capcoder")
 
 DEFAULT_HTTP_PORT = 8073
 DEFAULT_UDP_PORT = 8888
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="python -m vpager", description="Virtual Motorola Advisor-style pager.")
+    p = argparse.ArgumentParser(prog="python -m capcoder", description="Mockorola Capcoder: a virtual Motorola Advisor-style pager.")
     p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd")
 
@@ -61,21 +61,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     misc = p.add_argument_group("files and UI")
     misc.add_argument("--data-dir", type=Path, help=f"where state and logs go (default {default_data_dir()})")
-    misc.add_argument("--log-file", type=Path, help="log file (default <data-dir>/vpager.log)")
+    misc.add_argument("--log-file", type=Path, help="log file (default <data-dir>/capcoder.log)")
     misc.add_argument("--tab", action="store_true",
                       help="open the pager in a normal browser tab instead of its own window")
     misc.add_argument("--browser", help="Edge/Chrome/Chromium binary for the pager window (default: found)")
     misc.add_argument("--no-browser", action="store_true", help="don't open a browser")
     misc.add_argument("-v", "--verbose", action="store_true", help="show debug messages on the console too")
 
-    inj = sub.add_parser("inject", help="send a fake decode to a running vpager")
+    inj = sub.add_parser("inject", help="send a fake decode to a running capcoder")
     inj.add_argument("text", nargs="?", default="", help="message text")
     inj.add_argument("--line", help="raw multimon-ng line to inject instead")
     inj.add_argument("--capcode", type=int, dest="inject_capcode",
                      help="address to page (default: the pager's own capcode)")
     inj.add_argument("--function", type=int, default=1, choices=range(4), help="POCSAG function bits (default 1)")
     inj.add_argument("--numeric", action="store_true", help="send as a Numeric decode instead of Alpha")
-    inj.add_argument("--port", type=int, default=DEFAULT_HTTP_PORT, help="vpager HTTP port (default 8073)")
+    inj.add_argument("--port", type=int, default=DEFAULT_HTTP_PORT, help="capcoder HTTP port (default 8073)")
     return p
 
 
@@ -91,13 +91,16 @@ def _log_uncaught(exc_type, exc, tb) -> None:
 
 
 def cmd_run(args) -> int:
+    migrated = None if args.data_dir else migrate_old_data_dir()
     data_dir = args.data_dir or default_data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
-    log_file = args.log_file or data_dir / "vpager.log"
+    log_file = args.log_file or data_dir / "capcoder.log"
     setup_logging(log_file, args.verbose)
     sys.excepthook = _log_uncaught
     threading.excepthook = lambda a: _log_uncaught(a.exc_type, a.exc_value, a.exc_traceback)
-    log.info("vpager %s starting (Python %s on %s)", __version__, sys.version.split()[0], sys.platform)
+    log.info("Mockorola Capcoder %s starting (Python %s on %s)", __version__, sys.version.split()[0], sys.platform)
+    if migrated:
+        log.info("%s", migrated)
     log.info("log file: %s", log_file)
     log.info("state file: %s", data_dir / "state.json")
 
@@ -125,7 +128,7 @@ def cmd_run(args) -> int:
         server = PagerServer((args.http_host, args.http_port), core)
     except OSError as e:
         log.error(
-            "cannot serve the pager page on %s:%d: %s. Is vpager already running? "
+            "cannot serve the pager page on %s:%d: %s. Is capcoder already running? "
             "Stop the other copy, or give this one different ports (--http-port, --udp-port).",
             args.http_host, args.http_port, e,
         )
@@ -183,7 +186,7 @@ def cmd_inject(args) -> int:
             line = f"POCSAG1200: Address: {capcode:>7}  Function: {args.function}  {kind}:   {args.text}"
         result = _http(base + "/api/inject", {"line": line})
     except (urllib.error.URLError, OSError) as e:
-        print(f"could not reach vpager on port {args.port}: {e}", file=sys.stderr)
+        print(f"could not reach capcoder on port {args.port}: {e}", file=sys.stderr)
         return 1
     print(f"{line}\n-> {result.get('result')}")
     return 0

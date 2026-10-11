@@ -1,13 +1,13 @@
-# vpager: a virtual Motorola Advisor-style pager
+# Mockorola Capcoder: a virtual Motorola Advisor-style pager
 
-Version 0.1 (git tag `v0.1`). See [CHANGELOG.md](CHANGELOG.md).
+Version 0.1 (git tag `v0.1`, released under the old name `vpager`). See [CHANGELOG.md](CHANGELOG.md).
 
-vpager is a virtual pager. It answers to one POCSAG capcode and shows that capcode's pages on a screen drawn to look like a Motorola Advisor alphanumeric pager from the early 1990s. You can change the capcode at any time.
+Mockorola Capcoder ("Capcoder" for short; the package and command are `capcoder`) is a virtual pager. The name is a nod to the Motorola Advisor it imitates: a mock Motorola that decodes capcodes. It answers to one POCSAG capcode and shows that capcode's pages on a screen drawn to look like a Motorola Advisor alphanumeric pager from the early 1990s. You can change the capcode at any time.
 
-It is the receive side of this repo. `hmew_pager` sends pages through the HME/JTECH iStation transmitter; vpager receives them off the air through an RTL-SDR and shows the ones meant for "its" pager.
+It is the receive side of this repo. `hmew_pager` sends pages through the HME/JTECH iStation transmitter; Capcoder receives them off the air through an RTL-SDR and shows the ones meant for "its" pager.
 
 ```
-iStation ──RF 457.575 MHz──▶ RTL-SDR ──▶ SDR++ ──UDP audio :8888──▶ vpager ──▶ browser
+iStation ──RF 457.575 MHz──▶ RTL-SDR ──▶ SDR++ ──UDP audio :8888──▶ Capcoder ──▶ browser
                                                                     │
                                                                     └─ multimon-ng (decoder)
 ```
@@ -19,7 +19,7 @@ Python 3, standard library only. The pager face is a single local web page, so i
 ### Requirements
 
 - Python 3.9 or newer (developed and tested on 3.13).
-- [multimon-ng](https://github.com/EliasOenal/multimon-ng). vpager looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with multimon-ng 1.3.0 and 1.6.0 on Windows.
+- [multimon-ng](https://github.com/EliasOenal/multimon-ng). Capcoder looks for it on PATH, then (on Windows) in `C:\rtl-sdr`; `--mmng` overrides both. Tested with multimon-ng 1.3.0 and 1.6.0 on Windows.
 - Something that sends raw demodulated audio over UDP: 16-bit signed mono at 22050 Hz. The SDR++ network sink does this, with the same settings mmng-ui uses.
 
 ### Run
@@ -27,16 +27,16 @@ Python 3, standard library only. The pager face is a single local web page, so i
 From the repo root:
 
 ```
-python -m vpager --capcode 870024
-python -m vpager --base 87 --pager 3          # same capcode, from HME base ID + pager number
-python -m vpager --mmng C:\tools\multimon-ng.exe --capcode 870024
+python -m capcoder --capcode 870024
+python -m capcoder --base 87 --pager 3          # same capcode, from HME base ID + pager number
+python -m capcoder --mmng C:\tools\multimon-ng.exe --capcode 870024
 ```
 
-This opens `http://127.0.0.1:8073/` in its own browser window, separate from your other tabs, so you can size and place it on its own. The page scales the pager to fit the window. vpager uses the app mode of Edge, Chrome or Chromium (`--app=URL`, no tabs or address bar), whichever it finds first; with none of them it falls back to a tab in your default browser. Use `--tab` for a normal tab, or `--browser PATH` to pick the browser.
+This opens `http://127.0.0.1:8073/` in its own browser window, separate from your other tabs, so you can size and place it on its own. The page scales the pager to fit the window. Capcoder uses the app mode of Edge, Chrome or Chromium (`--app=URL`, no tabs or address bar), whichever it finds first; with none of them it falls back to a tab in your default browser. Use `--tab` for a normal tab, or `--browser PATH` to pick the browser.
 
 Point SDR++'s network sink at UDP port 8888 on this machine. Click the page once so the browser allows sound.
 
-Run one copy per set of ports. A second copy on the same HTTP port exits with "Is vpager already running?". If the UDP port is held by another program, such as mmng-ui, vpager shows `port 8888 in use, retrying` and takes the port once it is free.
+Run one copy per set of ports. A second copy on the same HTTP port exits with "Is Capcoder already running?". If the UDP port is held by another program, such as mmng-ui, Capcoder shows `port 8888 in use, retrying` and takes the port once it is free.
 
 Once set, the capcode is saved. Later runs remember it, and you can also change it from the pager's own menu.
 
@@ -57,25 +57,27 @@ Once set, the capcode is saved. Later runs remember it, and you can also change 
 | `--dedupe S` | 10 | ignore an identical page (same capcode, function and text) within S seconds; 0 turns it off |
 | `--no-receiver` | | don't listen for audio; injected pages only |
 | `--data-dir` | see below | where state and logs are kept |
-| `--log-file` | `<data-dir>/vpager.log` | log file |
+| `--log-file` | `<data-dir>/capcoder.log` | log file |
 | `--tab` | | open in a normal browser tab instead of its own window |
 | `--browser PATH` | found | Edge/Chrome/Chromium binary for the pager window |
 | `--no-browser` | | don't open a browser |
 | `-v` | | show DEBUG messages on the console too |
 
-Default data directory: `%USERPROFILE%\.vpager` on Windows, `~/Library/Application Support/vpager` on macOS, `~/.local/state/vpager` on Linux.
+Default data directory: `%USERPROFILE%\.capcoder` on Windows, `~/Library/Application Support/capcoder` on macOS, `~/.local/state/capcoder` on Linux.
 
-On Windows it is deliberately not under `%LOCALAPPDATA%`. The Microsoft Store build of Python silently redirects writes there into its own package folder (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.*\LocalCache\Local\...`), so the log would not be where vpager says it is.
+On Windows it is deliberately not under `%LOCALAPPDATA%`. The Microsoft Store build of Python silently redirects writes there into its own package folder (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.*\LocalCache\Local\...`), so the log would not be where Capcoder says it is.
+
+Upgrading from vpager: on the first run without `--data-dir`, an existing vpager data directory (`%USERPROFILE%\.vpager`, or `vpager` on macOS/Linux) is moved to the new location, so the capcode, messages and settings carry over. Old log files keep their `vpager.log` names. Stop any running vpager first, or the move fails and Capcoder starts with empty state.
 
 ### Sending test pages without a radio
 
-`inject` sends a line to a running vpager in the same format multimon-ng prints. The line then goes through the same parser, filter and alert path as a real decode:
+`inject` sends a line to a running Capcoder in the same format multimon-ng prints. The line then goes through the same parser, filter and alert path as a real decode:
 
 ```
-python -m vpager inject "DON'T RUSH FLIGHT CANCELLED-NEW FLIGHT #687 AT 5:25 PM"
-python -m vpager inject --numeric --function 0 "555-1212"
-python -m vpager inject --capcode 874440 "someone else's page"      # ignored by the filter
-python -m vpager inject --line "POCSAG1200: Address:  870024  Function: 1  Alpha:   HI"
+python -m capcoder inject "DON'T RUSH FLIGHT CANCELLED-NEW FLIGHT #687 AT 5:25 PM"
+python -m capcoder inject --numeric --function 0 "555-1212"
+python -m capcoder inject --capcode 874440 "someone else's page"      # ignored by the filter
+python -m capcoder inject --line "POCSAG1200: Address:  870024  Function: 1  Alpha:   HI"
 ```
 
 `inject` is accepted only from the same machine.
@@ -95,13 +97,13 @@ To send a real page over the air, use the sender in this repo (`hmew_pager`) and
  │  └─────────────────────────────────────────────────────┘  │
  │  [ ▬ Read ]  [ ▬ Function ]       ( ◀ )  [ ▲ ]  ( ▶ )     │
  │  ┌─────────────────────────┐              [ ▼ ]           │
- │  │ (V) vPAGER  MESSAGE RCVR │                               │
+ │  │ (Ø) MOCKOROLA  CAPCODER  │                               │
  │  └─────────────────────────┘                               │
  └───────────────────────────────────────────────────────────┘
    capcode · UDP status · multimon-ng status · last decode · log path
 ```
 
-- **Case:** drawn with CSS, with no images. The badge reads "vPAGER" instead of Motorola branding.
+- **Case:** drawn with CSS, with no images. The badge reads "MOCKOROLA" with "CAPCODER" underneath, and the round logo holds a slashed zero like the LCD's. It is a parody: no Motorola name or batwing logo.
 - **LCD:** a canvas with a 5×7 dot-matrix font and a slashed zero, as on the Advisor. Unlit dots show faintly and lit dots cast a slight shadow, like a reflective LCD. The backlight turns the screen glowing green.
 - **Status line under the pager:** shows the capcode (with HME base and pager number), UDP state and sender, multimon-ng state, the last decode for any capcode with what happened to it, and the log file path.
 
@@ -156,8 +158,8 @@ Hold On/Reset to show `PUSH FOR OFF`, then press Function to turn the pager off.
 - **The browser draws the face; Python does the receiving.** Standard desktop GUI toolkits tend to look dated, and the pager is mostly timing: flashing symbols, 4 s scroll, 12 s alerts, 1 s holds. That runs smoothly in the browser. Python handles the parts that need the machine: UDP, the multimon-ng subprocess, filtering, storage and logging. Because it's a web page, it also works on any OS and can be viewed from another device with `--http-host 0.0.0.0`.
 - **Not Streamlit.** Streamlit reruns the whole script on the server for every click and has no clean way to push an incoming page to the browser. That makes timed button behavior laggy, and the custom drawing would have to live in an HTML component anyway.
 - **Standard library only.** `http.server` serves the page and server-sent events, `asyncio` runs UDP and the subprocess, and `logging` writes the log file. The same rule applies to the rest of the repo.
-- **Same input as mmng-ui.** vpager listens on UDP 8888 for the raw audio SDR++ already sends. The UDP-to-multimon-ng code is adapted from [mmng-ui](https://github.com/lingfish/mmng-ui), which is GPL-3.0 like this repo; attribution and a list of changes are in the header of `receiver.py`. Only one program can listen on a given port, so to run both, give vpager or mmng-ui a different port and add a second sink.
-- **Decoder settings.** vpager runs multimon-ng with mmng-ui's POCSAG arguments, minus `-u`:
+- **Same input as mmng-ui.** Capcoder listens on UDP 8888 for the raw audio SDR++ already sends. The UDP-to-multimon-ng code is adapted from [mmng-ui](https://github.com/lingfish/mmng-ui), which is GPL-3.0 like this repo; attribution and a list of changes are in the header of `receiver.py`. Only one program can listen on a given port, so to run both, give Capcoder or mmng-ui a different port and add a second sink.
+- **Decoder settings.** Capcoder runs multimon-ng with mmng-ui's POCSAG arguments, minus `-u`:
   `-a POCSAG512 -a POCSAG1200 -a POCSAG2400 -f alpha -t raw -q --timestamp -p -C US -`
   - **`-f alpha` (force text decoding) is needed for the iStation.** POCSAG can encode a message body as numeric digits (4 bits each) or as 7-bit ASCII text, and the function bits conventionally say which (0 = numeric, 3 = alpha). The HMEW protocol document only describes what the PC sends; it doesn't say how the transmitter encodes pages on air, and you can't choose it. On 2026-10-10 a page to pager 1 (capcode 870008) arrived with `Function: 0`, which by convention means numeric, yet decoded cleanly as the text `5551212` under `-f alpha`. The unit therefore sent the body as text despite the numeric function bits. In `standard` mode multimon-ng trusts the function bits and would very likely garble such pages. If a page for your capcode ever shows up garbled, the unit may have sent real numeric encoding; try `--decode-mode auto` then.
   - **`-u` (prune unlikely decodes) is left out.** It was tried with multimon-ng 1.3.0 and 1.6.0 and made the output messier, with stray address-only decodes for random capcodes. Those decodes are ignored by the capcode filter anyway; they only clutter the log. If noise is still a problem, dropping `-p` (show partial messages) is the next thing to try, through `--mmng-args`.
@@ -169,7 +171,7 @@ Hold On/Reset to show `PUSH FOR OFF`, then press Function to turn the pager off.
 ## Structure
 
 ```
-vpager/
+capcoder/
   __main__.py   command line: run (default) and inject
   core.py       Core: handles each decode line (log, parse, capcode filter, dedupe, store),
                 Hub: pushes server-sent events to browsers
@@ -185,7 +187,7 @@ vpager/
     pager.css   the case, keys, lamp, vibrate animation
     font.js     5x7 glyphs and icons (speaker, lock, envelope, ...)
     pager.js    LCD renderer, screens and button behavior, alerts, sound, connection
-tests/test_vpager.py   unit tests (repo root)
+tests/test_capcoder.py   unit tests (repo root)
 ```
 
 ### HTTP API (local)
@@ -200,15 +202,15 @@ tests/test_vpager.py   unit tests (repo root)
 
 ## Logging
 
-Everything goes to `<data-dir>/vpager.log` at DEBUG level. The file rotates at 5 MB and keeps 5 old files. The console shows INFO, or DEBUG with `-v`. The log path is printed at startup and shown under the pager. The log includes:
+Everything goes to `<data-dir>/capcoder.log` at DEBUG level. The file rotates at 5 MB and keeps 5 old files. The console shows INFO, or DEBUG with `-v`. The log path is printed at startup and shown under the pager. The log includes:
 
 - startup settings, the capcode, and the paths in use
-- every raw multimon-ng output line (`vpager.decode`) and its stderr (`vpager.multimon`)
+- every raw multimon-ng output line (`capcoder.decode`) and its stderr (`capcoder.multimon`)
 - each parsed page with its verdict: `stored`, `ignored: other capcode`, `ignored: duplicate`, `ignored: pager is off`, `ignored: no capcode set`
 - the UDP audio sender, audio started/stopped, packet stats every minute, and dropped audio
 - multimon-ng start, exit code and restarts
 - UI actions (lock, delete, settings, ...) and refusals such as `LOCK FULL`
-- from the browser (`vpager.ui`): key presses, screen changes, alerts, JavaScript errors
+- from the browser (`capcoder.ui`): key presses, screen changes, alerts, JavaScript errors
 - uncaught exceptions in any thread, with traceback
 
 ## Testing
@@ -216,14 +218,14 @@ Everything goes to `<data-dir>/vpager.log` at DEBUG level. The file rotates at 5
 **Unit tests** cover the decoder, memory limits, the capcode filter, duplicate suppression and events:
 
 ```
-python -m unittest tests.test_vpager -v
+python -m unittest tests.test_capcoder -v
 ```
 
 **Manual, without a radio:**
 
 ```
-python -m vpager --capcode 870024 --no-receiver
-python -m vpager inject "TEST 1"
+python -m capcoder --capcode 870024 --no-receiver
+python -m capcoder inject "TEST 1"
 ```
 
 **Scripted key presses:** add `?keys=` to the page URL to press buttons after load. This is useful for checking a screen or taking screenshots:
@@ -240,7 +242,7 @@ http://127.0.0.1:8073/?keys=func,right&step=0    # global menu, all keys at once
 msedge --headless=new --window-size=1000,560 --screenshot=shot.png "http://127.0.0.1:8073/?step=0&keys=read,read"
 ```
 
-**End to end:** run vpager with SDR++ sending audio, then page the test capcode with `hmew_pager`. Check that the status line shows `receiving` and that the decode appears in the log.
+**End to end:** run Capcoder with SDR++ sending audio, then page the test capcode with `hmew_pager`. Check that the status line shows `receiving` and that the decode appears in the log.
 
 ## Open questions
 

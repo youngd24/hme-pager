@@ -236,11 +236,11 @@ body {
 }
 .model {
   position: absolute;
-  right: 22px;
-  bottom: 6px;
+  right: 24px;
+  bottom: 4px;
   color: var(--gold);
-  font: 600 11px/14px "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: 3px;
+  font: 600 15px/18px "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  letter-spacing: 4px;
   opacity: .85;
 }
 

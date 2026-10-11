@@ -23,8 +23,8 @@ from urllib.parse import urlsplit
 from .core import Core
 from .store import StoreError
 
-log = logging.getLogger("vpager.http")
-ui_log = logging.getLogger("vpager.ui")
+log = logging.getLogger("capcoder.http")
+ui_log = logging.getLogger("capcoder.ui")
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
 MAX_BODY = 64 * 1024
@@ -43,7 +43,7 @@ class PagerServer(ThreadingHTTPServer):
     daemon_threads = True
     block_on_close = False
     # HTTPServer turns on SO_REUSEADDR, which on Windows lets a second process bind a
-    # port that is already in use. Off there, plus exclusive use, so a second vpager
+    # port that is already in use. Off there, plus exclusive use, so a second capcoder
     # fails to start instead of quietly sharing the port.
     allow_reuse_address = sys.platform != "win32"
 
@@ -59,7 +59,7 @@ class PagerServer(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     server: PagerServer
-    server_version = "vpager"
+    server_version = "capcoder"
 
     def log_message(self, fmt, *args) -> None:
         if "/api/log " in self.requestline:   # the UI line itself is already logged

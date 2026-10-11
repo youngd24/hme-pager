@@ -20,8 +20,8 @@ from . import __version__
 from .decode import parse_line
 from .store import MAX_LOCKED, MAX_PERSONAL, MAX_SLOTS, Store
 
-log = logging.getLogger("vpager.core")
-decode_log = logging.getLogger("vpager.decode")
+log = logging.getLogger("capcoder.core")
+decode_log = logging.getLogger("capcoder.decode")
 
 
 class Hub:
