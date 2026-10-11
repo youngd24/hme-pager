@@ -1,6 +1,6 @@
 # Mockorola Capcoder: a virtual Motorola Advisor-style pager
 
-Version 0.3 (git tag `v0.3`). Version 0.1 was released under the old name `vpager`. See [CHANGELOG.md](CHANGELOG.md).
+Version 0.4 (git tag `v0.4`). Version 0.1 was released under the old name `vpager`. See [CHANGELOG.md](CHANGELOG.md).
 
 Mockorola Capcoder ("Capcoder" for short; the package and command are `capcoder`) is a virtual pager. The name is a nod to the Motorola Advisor it imitates: a mock Motorola that decodes capcodes. It answers to one POCSAG capcode and shows that capcode's pages on a screen drawn to look like a Motorola Advisor alphanumeric pager from the early 1990s. You can change the capcode at any time.
 

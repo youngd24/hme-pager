@@ -33,7 +33,7 @@ Operating systems: **Ubuntu 24.04** for Linux and **Windows 11** for Windows. Se
 | [`refdocs/`](refdocs/) | Reference documents: the HMEW Integration Protocol and the Motorola Advisor user manual. |
 | [`assets/`](assets/) | Images used in the docs. |
 | [`TODO.md`](TODO.md) | Open items for later. |
-| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each tagged release (current: 0.3). |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each tagged release (current: 0.4). |
 
 ## Sending pages: `pager.py`
 

@@ -2,7 +2,9 @@
 
 Releases of the whole repo, tagged in git. Capcoder's own detailed changes are in [capcoder/CHANGELOG.md](capcoder/CHANGELOG.md).
 
-## Unreleased
+## 0.4 (2026-10-11), git tag `v0.4`
+
+Tested on the real unit after the cleanup: pages sent over serial (Linux) and over the network (from both Windows and Linux) were received as before, and all 85 unit tests pass.
 
 **Code style: PEP 8**
 - All Python code (`hmew`, `pager.py`, `capcoder`, tests) now meets PEP 8, including its 79-character line limit. `pycodestyle` reports nothing.
