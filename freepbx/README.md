@@ -4,7 +4,7 @@ Use this to create an IVR on FreePBX/Asterisk, I'm on Debian/17, that's where th
 
 # Generate TTS Audio Files
 
-I do this on another Ubuntu machine or under WSL on Windows, not the FreePBX one.
+I do this on another Ubuntu machine or under WSL on Windows, not the FreePBX one. If you don't want to, feel free to use the ones I've included in here.
 
 ## Install prerequisite packages:
 ```
