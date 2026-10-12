@@ -6,7 +6,7 @@ Use this to create an IVR on FreePBX/Asterisk, I'm on Debian/17, that's where th
 
 I do this on another Ubuntu machine or under WSL on Windows, not the FreePBX one.
 
-## Install pre-requisite packages:
+## Install prerequisite packages:
 ```
 sudo apt install sox
 ```
@@ -69,19 +69,19 @@ pagerivr-sent.wav
 
 ## Install the hme pager cli
 
-I insatll into /usr/local, you can do it elsewhere, as the asterisk user:
+I install into /usr/local, you can do it elsewhere, as the asterisk user:
 
 ```
-sudo git clone git@github.com:youngd24/hme-pager.git /usr/local/hme-pager
-chown -R asterisk:asterisk /usr/local/hmew-pager
+sudo git clone https://github.com/youngd24/hme-pager.git
+chown -R asterisk:asterisk /usr/local/hme-pager
 sudo chmod +x /usr/local/hme-pager/hmepager
 ```
 
 ## Create a config file
 
 ```
-mkdir $HOME/.hme-pager
-cp /usr/local/hme-pager/config.example $HOME/.hme-pager/config
+sudo mkdir ~askterisk/.hme-pager
+sudo cp /usr/local/hme-pager/config.example ~asterisk/.hme-pager/config
 ```
 
 ## Example config
@@ -114,7 +114,7 @@ verbose = false
 ## Test the pager
 
 ```
-/usr/local/hme-pager/hmepager <pagerid> 5551234; echo "exit=$?"
+/usr/local/hme-pager/hmepager -p <pagerid> 5551234; echo "exit=$?"
 ```
 
 ## Install audio files
