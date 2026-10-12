@@ -113,6 +113,8 @@ verbose = false
 
 ## Test the pager
 
+(as the asterisk user)
+
 ```
 /usr/local/hme-pager/hmepager -p <pagerid> 5551234; echo "exit=$?"
 ```
