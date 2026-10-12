@@ -203,3 +203,7 @@ dial-peer voice 3682 voip
  codec g711ulaw
  no vad
 ```
+
+## Testing and troubleshooting
+
+Call the extension, you should be asked to enter the pager number, enter it then the other parts and see if it works. You're on your own for troubleshooting, FreePBX isn't my strongest of areas. If there are any glaring things wrong here feel free to fix it and put in a PR.
