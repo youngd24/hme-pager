@@ -6,9 +6,8 @@ Use this to create an IVR on FreePBX/Asterisk, I'm on Debian/17, that's where th
 
 I do this on another Ubuntu machine or under WSL on Windows, not the FreePBX one.
 
-## Install packages:
+## Install pre-requisite packages:
 ```
-sudo apt install flite
 sudo apt install sox
 ```
 
@@ -46,10 +45,8 @@ mkdir -p "$OUT"
 while IFS='|' read -r name text; do
   [[ -z "$name" || "$name" == \#* ]] && continue
   tmp=$(mktemp --suffix=.wav)
-  #flite -t "$text" -o "$tmp"
   piper -m en_US-lessac-medium -f "$tmp" -- "$text"
   # Asterisk-friendly: 8 kHz, mono, 16-bit PCM
-  #sox "$tmp" -r 8000 -c 1 -b 16 "$OUT/$name.wav"
   sox "$tmp" -r 8000 -c 1 -b 16 "$OUT/$name.wav" gain -n -3
   rm -f "$tmp"
   echo "built $name.wav"
@@ -98,7 +95,7 @@ cp /usr/local/hme-pager/config.example $HOME/.hme-pager/config
 mode = network
 
 # For network: the transmitter's address, host or host:port (port 80 if not given).
-host = 192.168.1.35
+host = 192.168.x.x
 
 # For serial: the port the transmitter's cable is on.
 serial_port = /dev/ttyS0
@@ -187,4 +184,20 @@ exten => s,1,Answer()
  sudo fwconsole reload
 sudo asterisk -rx "dialplan show 3682@from-internal-custom"
 sudo asterisk -rx "dialplan show app-pagerivr"
+```
+
+## Cisco Config
+
+Here's an example of my configuration that sends calls there:
+
+```
+conf t
+dial-peer voice 3682 voip
+ description Outbound to FreePBX - PAGER IVR
+ destination-pattern 3682
+ session protocol sipv2
+ session target ipv4:192.168.x.x
+ dtmf-relay rtp-nte
+ codec g711ulaw
+ no vad
 ```
