@@ -130,7 +130,7 @@ sudo chown asterisk:asterisk /var/lib/asterisk/sounds/en/custom/pagerivr-*.wav
 
 ## Create the dialplan
 
-For my example it's using the extension 3682
+The example below uses the extension 3682, adjust to whatever yours needs to be.
 
 Append this to `/etc/asterisk/extensions_custom.conf`:
 
