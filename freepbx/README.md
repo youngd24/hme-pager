@@ -53,7 +53,7 @@ while IFS='|' read -r name text; do
 done < prompts.txt
 ```
 
-You should now have these files:
+You should now have these files in `sounds/en/custom`:
 ```
 pagerivr-confirm.wav
 pagerivr-enter-message.wav
