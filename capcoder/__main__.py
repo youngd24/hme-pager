@@ -30,7 +30,7 @@ from .launch import open_ui
 from .logsetup import default_data_dir, migrate_old_data_dir, setup_logging
 from .receiver import DECODE_MODES, Receiver, multimon_args
 from .server import PagerServer
-from .store import Store, StoreError
+from .store import MAX_CAPCODE, MIN_CAPCODE, Store, StoreError
 
 log = logging.getLogger("capcoder")
 
@@ -226,21 +226,28 @@ def cmd_run(args) -> int:
     log.info("state file: %s", data_dir / "state.json")
 
     store = Store(data_dir / "state.json")
-    try:
-        if args.capcode is not None:
-            store.apply("capcode", value=args.capcode)
-        elif args.pager is not None or args.base is not None:
-            if args.pager is None or args.base is None:
-                log.error("--base and --pager must be used together")
-                return 2
-            from hmew.models import pager_to_capcode
+    wanted = None
+    if args.capcode is not None:
+        wanted = args.capcode
+    elif args.pager is not None or args.base is not None:
+        if args.pager is None or args.base is None:
+            log.error("--base and --pager must be used together")
+            return 2
+        from hmew.models import pager_to_capcode
 
-            store.apply(
-                "capcode", value=pager_to_capcode(args.base, args.pager)
+        wanted = pager_to_capcode(args.base, args.pager)
+    if wanted is not None:
+        try:
+            store.apply("capcode", value=wanted)
+        except StoreError:
+            # StoreError's own text is short for the LCD; say more here.
+            log.error(
+                "bad capcode %s: must be %d-%d",
+                wanted,
+                MIN_CAPCODE,
+                MAX_CAPCODE,
             )
-    except StoreError as e:
-        log.error("bad capcode: %s", e)
-        return 2
+            return 2
     if store.capcode is None:
         log.warning(
             "no capcode set; pages will be logged but not shown. "

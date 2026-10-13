@@ -2,6 +2,13 @@
 
 Releases of the whole repo, tagged in git. Capcoder's own detailed changes are in [capcoder/CHANGELOG.md](capcoder/CHANGELOG.md).
 
+## 0.4.1 (2026-10-12), git tag `v0.4.1`
+
+**Receiving: Mockorola Capcoder 0.4.1**
+- **`capcoder.cmd`:** a new Windows launcher in the repo root. Run `capcoder.cmd [CAPCODE]`; it defaults to 870008 (base 087, pager 1) and works from any folder.
+- **Clearer startup error:** a bad capcode at startup now logs which capcode and the valid range, e.g. `bad capcode 8700008: must be 1-2097151`, instead of just `BAD CAPCODE`. With `--base`/`--pager`, it shows the capcode they produce.
+- **Tests:** new startup tests for a bad `--capcode`, a bad `--base`/`--pager` combination, and `--base` without `--pager`. The suite is now 88 tests.
+
 ## 0.4 (2026-10-11), git tag `v0.4`
 
 Tested on the real unit after the cleanup: pages sent over serial (Linux) and over the network (from both Windows and Linux) were received as before, and all 85 unit tests pass.

@@ -1,5 +1,11 @@
 # Mockorola Capcoder changelog
 
+## 0.4.1 (2026-10-12), git tag `v0.4.1`
+
+- **`capcoder.cmd`:** a Windows launcher in the repo root. `capcoder.cmd [CAPCODE]` starts Capcoder for that capcode, or 870008 (base 087, pager 1) if none is given. It switches to the repo folder first, so it works when started from anywhere.
+- **Clearer startup error:** a bad capcode now logs the value and the valid range, e.g. `bad capcode 8700008: must be 1-2097151`. With `--base`/`--pager` it shows the resulting capcode. The short `BAD CAPCODE` shown on the pager's LCD (from the capcode menu) is unchanged.
+- **Tests:** `StartupCapcodeTests` runs Capcoder as a separate process and checks that a bad capcode, a bad base/pager combination, and `--base` without `--pager` each exit with code 2 and the right log line before anything starts.
+
 ## 0.4 (2026-10-11), git tag `v0.4`
 
 - **PEP 8 formatting only:** 79-character lines, wrapped strings and docstrings. Behavior and output are unchanged.

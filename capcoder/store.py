@@ -21,6 +21,7 @@ log = logging.getLogger("capcoder.store")
 MAX_SLOTS = 19
 MAX_LOCKED = 10
 MAX_PERSONAL = 10
+MIN_CAPCODE = 1
 MAX_CAPCODE = 2_097_151  # POCSAG addresses are 21 bits
 
 AUDIBLE_ALERTS = (
@@ -56,7 +57,7 @@ def parse_capcode(value: Any) -> int:
         capcode = int(value)
     except (TypeError, ValueError):
         raise StoreError("BAD CAPCODE") from None
-    if not 1 <= capcode <= MAX_CAPCODE:
+    if not MIN_CAPCODE <= capcode <= MAX_CAPCODE:
         raise StoreError("BAD CAPCODE")
     return capcode
 

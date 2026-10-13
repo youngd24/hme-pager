@@ -29,11 +29,12 @@ Operating systems: **Ubuntu 24.04** for Linux and **Windows 11** for Windows. Se
 | [`pager.py`](pager.py) | Command line for sending a page, built on `hmew`. |
 | [`config.example`](config.example) | Example defaults for `pager.py`; copy to `~/.hme-pager/config`. |
 | [`capcoder/`](capcoder/) | **Mockorola Capcoder**: a virtual Motorola Advisor-style pager that answers to one capcode. See its [README](capcoder/README.md). |
+| [`capcoder.cmd`](capcoder.cmd) | Windows launcher for Capcoder: `capcoder.cmd [CAPCODE]`, default 870008 (pager 1). |
 | [`tests/`](tests/) | Unit tests for both sides. |
 | [`refdocs/`](refdocs/) | Reference documents: the HMEW Integration Protocol and the Motorola Advisor user manual. |
 | [`assets/`](assets/) | Images used in the docs. |
 | [`TODO.md`](TODO.md) | Open items for later. |
-| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each tagged release (current: 0.4). |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed in each tagged release (current: 0.4.1). |
 
 ## Sending pages: `pager.py`
 

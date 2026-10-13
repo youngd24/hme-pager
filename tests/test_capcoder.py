@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime
@@ -7,12 +9,15 @@ from pathlib import Path
 from capcoder.core import Core, Hub
 from capcoder.decode import parse_line
 from capcoder.store import (
+    MAX_CAPCODE,
     MAX_LOCKED,
     MAX_PERSONAL,
     MAX_SLOTS,
     Store,
     StoreError,
 )
+
+REPO = Path(__file__).resolve().parent.parent
 
 
 def line(capcode=870024, function=1, kind="Alpha", text="555-1212"):
@@ -115,6 +120,45 @@ class StoreTests(unittest.TestCase):
         for bad in (0, -1, 2_097_152, "abc"):
             with self.assertRaises(StoreError):
                 self.store.apply("capcode", value=bad)
+
+
+class StartupCapcodeTests(unittest.TestCase):
+    """python -m capcoder with a bad capcode stops before starting anything.
+
+    Runs Capcoder as its own process, the way capcoder.cmd does, with a
+    temporary data folder, no browser and no receiver.
+    """
+
+    def run_capcoder(self, *args):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = subprocess.run(
+                [sys.executable, "-m", "capcoder", "--data-dir", tmp,
+                 "--no-browser", "--no-receiver", *args],
+                cwd=REPO,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            log = (Path(tmp) / "capcoder.log").read_text(encoding="utf-8")
+        return proc.returncode, log
+
+    def test_bad_capcode_exits_2_and_says_why(self):
+        for bad in ("8700008", "0", str(MAX_CAPCODE + 1)):
+            code, log = self.run_capcoder("--capcode", bad)
+            self.assertEqual(code, 2, bad)
+            self.assertIn(f"bad capcode {bad}: must be 1-{MAX_CAPCODE}", log)
+            self.assertNotIn("pager page:", log)   # never got to serving
+
+    def test_bad_base_and_pager_reports_resulting_capcode(self):
+        # base 300, pager 1 -> 3000008, past the largest POCSAG address
+        code, log = self.run_capcoder("--base", "300", "--pager", "1")
+        self.assertEqual(code, 2)
+        self.assertIn("bad capcode 3000008", log)
+
+    def test_base_without_pager(self):
+        code, log = self.run_capcoder("--base", "87")
+        self.assertEqual(code, 2)
+        self.assertIn("--base and --pager must be used together", log)
 
 
 class CoreTests(unittest.TestCase):

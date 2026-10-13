@@ -1,6 +1,6 @@
 # Mockorola Capcoder: a virtual Motorola Advisor-style pager
 
-Version 0.4 (git tag `v0.4`). Version 0.1 was released under the old name `vpager`. See [CHANGELOG.md](CHANGELOG.md).
+Version 0.4.1 (git tag `v0.4.1`). Version 0.1 was released under the old name `vpager`. See [CHANGELOG.md](CHANGELOG.md).
 
 Mockorola Capcoder ("Capcoder" for short; the package and command are `capcoder`) is a virtual pager. The name is a nod to the Motorola Advisor it imitates: a mock Motorola that decodes capcodes. It answers to one POCSAG capcode and shows that capcode's pages on a screen drawn to look like a Motorola Advisor alphanumeric pager from the early 1990s. You can change the capcode at any time.
 
@@ -31,6 +31,8 @@ python -m capcoder --capcode 870024
 python -m capcoder --base 87 --pager 3          # same capcode, from HME base ID + pager number
 python -m capcoder --mmng C:\tools\multimon-ng.exe --capcode 870024
 ```
+
+On Windows, `capcoder.cmd` in the repo root does the same from any folder: `capcoder.cmd 870024`, or just `capcoder.cmd` for the default, 870008 (base 087, pager 1).
 
 This opens `http://127.0.0.1:8073/` in its own browser window, separate from your other tabs, so you can size and place it on its own. The page scales the pager to fit the window. Capcoder uses the app mode of Edge, Chrome or Chromium (`--app=URL`, no tabs or address bar), whichever it finds first; with none of them it falls back to a tab in your default browser. Use `--tab` for a normal tab, or `--browser PATH` to pick the browser.
 
